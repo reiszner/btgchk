@@ -30,6 +30,8 @@ int read_header (FILE *f, btg_header **head) {
 	new->base.max_x = 0.0;
 	new->base.min_y = 0.0;
 	new->base.max_y = 0.0;
+	new->base.holesize = 0.0;
+	new->base.material = NULL;
 	new->base.bsphere = NULL;
 	new->base.vertex = NULL;
 	new->base.vertex_array = NULL;

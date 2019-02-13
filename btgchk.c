@@ -40,15 +40,17 @@ int main(int argc, char *argv[])
 {
 
 	FILE *infile = NULL, *outfile = NULL;
-	char fullpath[PATH_MAX] = {"\0"}, basepath[PATH_MAX] = {"\0"}, filename[PATH_MAX] = {"\0"}, index_s[PATH_MAX] = {"\0"}, lat_s[PATH_MAX] = {"\0"}, lon_s[PATH_MAX] = {"\0"}, file[PATH_MAX] = {"\0"};
+	char fullpath[PATH_MAX] = {"\0"}, basepath[PATH_MAX] = {"\0"}, filename[PATH_MAX] = {"\0"}, file[PATH_MAX] = {"\0"};
+	char index_s[PATH_MAX] = {"\0"}, lat_s[PATH_MAX] = {"\0"}, lon_s[PATH_MAX] = {"\0"}, texture[64] = {"\0"};
 	int opt, flagp = 0, flaga = 0, flagi = 0, flagl = 0, flagm = 0, flagg = 0, index[5] = {0}, cnt;
+	double holesize = -2.0;
 	btg_header *airport = NULL, *tile[5] = {NULL};
 	coord_cart cart;
 	coord_geo geo;
 	btg_vertex *v;
 
 
-	while ((opt = getopt(argc, argv, "p:a:i:l:m:h")) != -1) {
+	while ((opt = getopt(argc, argv, "p:a:i:l:m:h:t:s")) != -1) {
 		switch (opt) {
 			case 'p':
 				strncpy(basepath, optarg, PATH_MAX);
@@ -71,11 +73,20 @@ int main(int argc, char *argv[])
 				strncpy(lon_s, optarg, PATH_MAX);
 				flagm = 1;
 				break;
+			case 's':
+				sscanf(optarg, "%lf", &holesize);
+				break;
+			case 't':
+				strncpy(texture, optarg, 64);
+				break;
 			case 'h':
 			default:
 				fprintf(stderr, "Usage: %s -p basepath -a airport\n", argv[0]);
 				fprintf(stderr, "       %s -p basepath -i tileindex\n", argv[0]);
 				fprintf(stderr, "       %s -p basepath -l latitude -m longitude\n", argv[0]);
+				fprintf(stderr, "additional parameters:\n");
+				fprintf(stderr, "          -t texture     a texture for closing holes\n");
+				fprintf(stderr, "          -s meter       the maximum size (in meter) of holes to close\n");
 				return EXIT_FAILURE;
 		}
 	}
@@ -192,7 +203,14 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "airport points to nowhere! exit.\n");
 			return EXIT_FAILURE;
 		}
-
+		if (holesize > -1.0)
+			airport->base.holesize = holesize;
+		else
+			airport->base.holesize = 350.0;
+		if (strlen(texture))
+			airport->base.material = texture;
+		else
+			airport->base.material = NULL;
 		airport->runway = runway;
 
 // correct index from bounding sphere
@@ -256,6 +274,14 @@ int main(int argc, char *argv[])
 				if (!tile[cnt]) {
 					fprintf(stderr, "tile '%s' points to nowhere! exit.\n", file);
 				}
+				if (holesize > -1.0)
+					tile[cnt]->base.holesize = holesize;
+				else
+					tile[cnt]->base.holesize = 350.0;
+				if (strlen(texture))
+					tile[cnt]->base.material = texture;
+				else
+					tile[cnt]->base.material = NULL;
 			}
 		}
 	}

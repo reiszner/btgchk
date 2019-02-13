@@ -168,6 +168,8 @@ typedef struct btg_base_s {
 	double max_x;
 	double min_y;
 	double max_y;
+	double holesize;
+	char *material;
 	btg_bsphere  *bsphere;
 	btg_vertex   *vertex;
 	btg_vertex   **vertex_array;

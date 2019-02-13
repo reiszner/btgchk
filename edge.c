@@ -471,14 +471,78 @@ btg_fence *find_fence (btg_fence *border) {
 
 
 
+int check_vectorline (btg_fence *fence, short aspect) {
+
+	double rate_x, rate_y, rate_z;
+	btg_edge edge_res;
+	vector vec_init, vec_now;
+	btg_border *init, *now;
+
+// get two vertices with the longest distance
+	edge_res = get_longest (fence->border);
+	switch (aspect) {
+		case USE_ABSOLUTE:
+			vec_init.x = edge_res.vertex[0]->absolute.x - edge_res.vertex[1]->absolute.x;
+			vec_init.y = edge_res.vertex[0]->absolute.y - edge_res.vertex[1]->absolute.y;
+			vec_init.z = edge_res.vertex[0]->absolute.z - edge_res.vertex[1]->absolute.z;
+			break;
+		case USE_RELATIVE:
+			vec_init.x = edge_res.vertex[0]->relative.x - edge_res.vertex[1]->relative.x;
+			vec_init.y = edge_res.vertex[0]->relative.y - edge_res.vertex[1]->relative.y;
+			vec_init.z = edge_res.vertex[0]->relative.z - edge_res.vertex[1]->relative.z;
+			break;
+		case USE_PROJECTION:
+			vec_init.x = edge_res.vertex[0]->projection.x - edge_res.vertex[1]->projection.x;
+			vec_init.y = edge_res.vertex[0]->projection.y - edge_res.vertex[1]->projection.y;
+			vec_init.z = 0.0;
+			break;
+	}
+	init = fence->border;
+	while (init->vertex != edge_res.vertex[0]) init = init->next;
+
+// check if all vertices placed on the same line
+	now = fence->border;
+	while (init && now) {
+		if (now != init) {
+			switch (aspect) {
+				case USE_ABSOLUTE:
+					vec_now.x = init->vertex->absolute.x - now->vertex->absolute.x;
+					vec_now.y = init->vertex->absolute.y - now->vertex->absolute.y;
+					vec_now.z = init->vertex->absolute.z - now->vertex->absolute.z;
+					break;
+				case USE_RELATIVE:
+					vec_now.x = init->vertex->relative.x - now->vertex->relative.x;
+					vec_now.y = init->vertex->relative.y - now->vertex->relative.y;
+					vec_now.z = init->vertex->relative.z - now->vertex->relative.z;
+					break;
+				case USE_PROJECTION:
+					vec_now.x = init->vertex->projection.x - now->vertex->projection.x;
+					vec_now.y = init->vertex->projection.y - now->vertex->projection.y;
+					vec_now.z = 0.0;
+					break;
+			}
+			rate_x = vec_now.x / vec_init.x;
+			rate_y = vec_now.y / vec_init.y;
+			rate_z = vec_now.z / vec_init.z;
+			if (fabs(rate_x - rate_y) > 0.001 || fabs(rate_x - rate_z) > 0.001 || fabs(rate_y - rate_z) > 0.001) {
+				init = NULL;
+			}
+		}
+		now = now->next;
+	}
+
+	if (init) return 1;
+
+	return 0;
+}
+
 btg_fence *examine_fence (btg_fence *fence, btg_base *base) {
 
 	int left_side = 0, right_side = 0;
-	btg_border *last = NULL, *now = NULL, *prev = NULL;
+	btg_border *last = NULL, *now = NULL;
 	double turn, ang_diff, angle[2];
-	vector vec_init, vec_now;
 	btg_edge edge_res;
-	double len, rate_x, rate_y, rate_z;
+	double len;
 
 	if (base == NULL) {
 		fprintf(stderr, "examine_fence: pointer to base is NULL! exit.\n");
@@ -501,34 +565,9 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *base) {
 // if fence is closed
 	if (last->edge->vertex[0] == fence->border->vertex || last->edge->vertex[1] == fence->border->vertex) {
 
-// get two vertices with the longest distance
-		edge_res = get_longest (fence->border);
-		vec_init.x = edge_res.vertex[0]->relative.x - edge_res.vertex[1]->relative.x;
-		vec_init.y = edge_res.vertex[0]->relative.y - edge_res.vertex[1]->relative.y;
-		vec_init.z = edge_res.vertex[0]->relative.z - edge_res.vertex[1]->relative.z;
-		prev = fence->border;
-		while (prev->vertex != edge_res.vertex[0]) prev = prev->next;
-
-// check if all vertices placed on the same line
-		now = fence->border;
-		while (prev && now) {
-			if (now != prev) {
-				vec_now.x = prev->vertex->relative.x - now->vertex->relative.x;
-				vec_now.y = prev->vertex->relative.y - now->vertex->relative.y;
-				vec_now.z = prev->vertex->relative.z - now->vertex->relative.z;
-				rate_x = vec_now.x / vec_init.x;
-				rate_y = vec_now.y / vec_init.y;
-				rate_z = vec_now.z / vec_init.z;
-				if (fabs(rate_x - rate_y) > 0.001 || fabs(rate_x - rate_z) > 0.001 || fabs(rate_y - rate_z) > 0.001) {
-					prev = NULL;
-				}
-			}
-			now = now->next;
-		}
-
 // if all vertices on the same vector, free it and return nothing ...
-		if (prev) {
-			printf("examine_fence: fence has all vertices on the same vector!\n");
+		if (check_vectorline(fence, USE_RELATIVE)) {
+			printf("examine_fence: fence has all vertices on same vector!\n");
 			free_border (fence->border);
 			free (fence);
 			return NULL;
@@ -573,8 +612,14 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *base) {
 				}
 				else if (right_side > 0 && left_side == 0) {
 					printf("examine_fence: fence is a hole!\n");
-					if ((fence->max_x - fence->min_x) < HOLESIZE && (fence->max_y - fence->min_y) < HOLESIZE) {
+					if ((fence->max_x - fence->min_x) < base->holesize && (fence->max_y - fence->min_y) < base->holesize) {
 						printf("examine_fence: close it!\n");
+						close_hole (fence, base);
+						return NULL;
+					}
+				}
+				else {
+					if (check_vectorline(fence, USE_PROJECTION)) {
 						close_hole (fence, base);
 						return NULL;
 					}
@@ -605,8 +650,14 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *base) {
 				}
 				else if (left_side > 0 && right_side == 0) {
 					printf("examine_fence: fence is a hole!\n");
-					if ((fence->max_x - fence->min_x) < HOLESIZE && (fence->max_y - fence->min_y) < HOLESIZE) {
+					if ((fence->max_x - fence->min_x) < base->holesize && (fence->max_y - fence->min_y) < base->holesize) {
 						printf("examine_fence: close it!\n");
+						close_hole (fence, base);
+						return NULL;
+					}
+				}
+				else {
+					if (check_vectorline(fence, USE_PROJECTION)) {
 						close_hole (fence, base);
 						return NULL;
 					}
@@ -647,33 +698,6 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *base) {
 		else {
 			printf("examine_fence: let it untouched %f\n", len);
 		}
-		/*
-			if (last->vertex == last->edge->vertex[0]) search = last->edge->vertex[1];
-			else search = last->edge->vertex[0];
-			edge = base->edge;
-			while (edge) {
-				if (
-			    (edge->vertex[0] == fence->border->vertex && edge->vertex[1] == search) ||
-			    (edge->vertex[1] == fence->border->vertex && edge->vertex[0] == search)
-			    ) break;
-				edge = edge->next;
-			}
-			if (edge) {
-				temp.side = 0;
-				temp.edge = edge;
-				temp.vertex = search;
-				temp.neighbour = NULL;
-				temp.tile = 0;
-				temp.next = NULL;
-//				last->next = &temp;
-				printf("insert triangle\n");
-				build_triangle (fence->border, fence->border->next, &temp, base, 3);
-			}
-			else {
-				printf("examine_fence: let it untouched %f\n", len);
-			}
-		}
-	*/
 	}
 
 	return fence;
@@ -1177,17 +1201,14 @@ btg_triangle *build_triangle (btg_border *b0, btg_border *b1, btg_border *b2, bt
 	if (obj[1] && len[1] > len[mat]) mat = 1;
 	if (obj[2] && len[2] > len[mat]) mat = 2;
 
-
-// special for CYYR -> mat fixed to 'EvergreenForest'
-/*
-	btg_triangle *tria = base->triangle;
-	while (tria && strcmp(tria->object->prop_material, "EvergreenForest")) tria = tria->next;
-	if (tria) {
-		mat = 3;
-		obj[mat] = tria->object;
+	if (base->material) {
+		btg_triangle *tria = base->triangle;
+		while (tria && strcmp(tria->object->prop_material, base->material)) tria = tria->next;
+		if (tria) {
+			mat = 3;
+			obj[mat] = tria->object;
+		}
 	}
-*/
-// end special
 
 	new_elem = obj[mat]->elem_list;
 	while (new_elem->next) new_elem = new_elem->next;
@@ -1298,9 +1319,10 @@ void close_hole (btg_fence *fence, btg_base *base) {
 	btg_border *now, *prev, *first, *second, *third;
 	btg_triangle *t_before, *t_after;
 	btg_vertex *v_res, *help;
-	int i, mark, cnt;
+	int i, mark, cnt, straight;
 	double len = 0.0, len_now = 0.0, *len_all;
 
+	straight = check_vectorline(fence, USE_PROJECTION);
 // look for edges shorter than 0.25cm
 	while (len < 0.25) {
 		len = 999999.0;
@@ -1310,7 +1332,10 @@ void close_hole (btg_fence *fence, btg_base *base) {
 
 // search shortest edge
 		while (now) {
-			len_now = pydacoras(now->edge->vertex[0], now->edge->vertex[1], USE_RELATIVE);
+			if (straight)
+				len_now = pydacoras(now->edge->vertex[0], now->edge->vertex[1], USE_PROJECTION);
+			else
+				len_now = pydacoras(now->edge->vertex[0], now->edge->vertex[1], USE_RELATIVE);
 			if (len_now < len) {
 				first = prev;
 				second = now;
