@@ -5,7 +5,7 @@
 
 #include "struct.h"
 
-int add_point (btg_element *elem, btg_base *base, char *material);
+int add_point (btg_element *elem, btg_base *base, btg_object *object);
 //btg_geometry *read_point (FILE *f, btg_base *base, unsigned int ver, unsigned int cnt, unsigned char mask, char *material);
 void free_point (btg_point *point);
 

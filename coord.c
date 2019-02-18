@@ -52,8 +52,8 @@ coord_geo cart2geo (coord_cart cart) {
 	geo.lat = angle1;
 	geo.lon = acosl(cart.x / length);
 	if (cart.y < 0.0) geo.lon *= -1.0;
-	geo.asl = sqrtl((dist.x * dist.x) + (dist.z * dist.z));
-	if (dist.x < 0.0) geo.asl *= -1.0;
+	geo.msl = sqrtl((dist.x * dist.x) + (dist.z * dist.z));
+	if (dist.x < 0.0) geo.msl *= -1.0;
 
 	return geo;
 }
@@ -78,9 +78,9 @@ coord_cart geo2cart (coord_geo geo) {
 	cart.z = cart.z * MAJOR_AXIS;
 
 // above sealevel
-	if (geo.asl) {
-		cart.x = cart.x + (cos(geo.lat) * geo.asl);
-		cart.z = cart.z + (sin(geo.lat) * geo.asl);
+	if (geo.msl) {
+		cart.x = cart.x + (cos(geo.lat) * geo.msl);
+		cart.z = cart.z + (sin(geo.lat) * geo.msl);
 	}
 
 // move to longitude
@@ -119,7 +119,7 @@ coord_geo index2geo (int index) {
 
 	geo.lat = ((base_y + slice_y / 8.0) * M_PI) / 180.0;
 	geo.lon = ((base_x + slice_x / slices) * M_PI) / 180.0;
-	geo.asl = 0.0;
+	geo.msl = 0.0;
 
 	return geo;
 }

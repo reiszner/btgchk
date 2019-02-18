@@ -67,48 +67,68 @@ btg_geometry *read_geometry (FILE *f, btg_base *base, unsigned int ver, unsigned
 	return geo;
 }
 
+unsigned int count_geometry (btg_geometry *geometry) {
+
+	unsigned int count = 0;
+
+	while (geometry) {
+		if (geometry->valid) count++;
+		geometry = geometry->next;
+	}
+
+	return count;
+}
+
 int write_geometry (FILE *f, btg_geometry *geo, unsigned int ver, unsigned char mask) {
 
 	unsigned short temp;
 
-	if (mask & MASK_VERTEX) {
-		if (ver == 7) {
-			temp = geo->vertex->index;
-			if (write_ushort(f, &temp)) return 1;
-		}
-		else if (ver == 10) {
-			if (write_uint(f, &geo->vertex->index)) return 1;
-		}
-	}
+	while (geo) {
+		if (geo->valid) {
 
-	if (mask & MASK_NORMAL) {
-		if (ver == 7) {
-			temp = geo->normal->index;
-			if (write_ushort(f, &temp)) return 2;
-		}
-		else if (ver == 10) {
-			if (write_uint(f, &geo->normal->index)) return 2;
-		}
-	}
+			if (mask & MASK_VERTEX) {
+				if (ver == 7) {
+					temp = geo->vertex->index;
+					if (write_ushort(f, &temp)) return 1;
+				}
+				else if (ver == 10) {
+					if (write_uint(f, &geo->vertex->index)) return 1;
+				}
+			}
 
-	if (mask & MASK_COLOR) {
-		if (ver == 7) {
-			temp = geo->color->index;
-			if (write_ushort(f, &temp)) return 3;
-		}
-		else if (ver == 10) {
-			if (write_uint(f, &geo->color->index)) return 3;
-		}
-	}
 
-	if (mask & MASK_TEXCOO) {
-		if (ver == 7) {
-			temp = geo->texcoo->index;
-			if (write_ushort(f, &temp)) return 4;
+			if (mask & MASK_NORMAL) {
+				if (ver == 7) {
+					temp = geo->normal->index;
+					if (write_ushort(f, &temp)) return 2;
+				}
+				else if (ver == 10) {
+					if (write_uint(f, &geo->normal->index)) return 2;
+				}
+			}
+
+			if (mask & MASK_COLOR) {
+				if (ver == 7) {
+					temp = geo->color->index;
+					if (write_ushort(f, &temp)) return 3;
+				}
+				else if (ver == 10) {
+					if (write_uint(f, &geo->color->index)) return 3;
+				}
+			}
+
+			if (mask & MASK_TEXCOO) {
+				if (ver == 7) {
+					temp = geo->texcoo->index;
+					if (write_ushort(f, &temp)) return 4;
+				}
+				else if (ver == 10) {
+					if (write_uint(f, &geo->texcoo->index)) return 4;
+				}
+			}
+
 		}
-		else if (ver == 10) {
-			if (write_uint(f, &geo->texcoo->index)) return 4;
-		}
+		geo = geo->next;
 	}
 
 	return 0;
@@ -128,6 +148,7 @@ void rec_geometry (btg_geometry *geo) {
 	if (geo->normal) geo->normal->count++;
 	if (geo->color) geo->color->count++;
 	if (geo->texcoo) geo->texcoo->count++;
+	geo->valid = 1;
 }
 
 void unrec_geometry (btg_geometry *geo) {
@@ -135,6 +156,7 @@ void unrec_geometry (btg_geometry *geo) {
 	if (geo->normal) geo->normal->count--;
 	if (geo->color) geo->color->count--;
 	if (geo->texcoo) geo->texcoo->count--;
+	geo->valid = 0;
 }
 
 void unalias_geometry (btg_geometry *geo) {
@@ -177,4 +199,24 @@ void unalias_geometry (btg_geometry *geo) {
 			geo->texcoo->count += use;
 		}
 	}
+}
+
+
+
+btg_geometry *new_geometry (btg_vertex *vertex, btg_normal *normal, btg_texcoo *texcoo, btg_color *color) {
+
+	btg_geometry *geo = NULL;
+
+	if ((geo = malloc(sizeof(*geo))) == NULL) {
+		fprintf(stderr, "No memory left for geometry! break.\n");
+		return NULL;
+	}
+	geo->valid = 0;
+	geo->vertex = vertex;
+	geo->normal = normal;
+	geo->texcoo = texcoo;
+	geo->color = color;
+	geo->next = NULL;
+
+	return geo;
 }

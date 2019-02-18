@@ -13,13 +13,8 @@
 
 btg_element *read_element (FILE *f, btg_base *base, unsigned int ver, unsigned char type, unsigned char mask, char *material) {
 
-	int i, num;
+	int i, num, res;
 	btg_element  *elem    = NULL;
-	btg_bsphere  *bsphere = NULL, *last_b = NULL;
-	btg_vertex   *vertex  = NULL, *last_v = NULL;
-	btg_normal   *normal  = NULL, *last_n = NULL;
-	btg_color    *color   = NULL, *last_c = NULL;
-	btg_texcoo   *texcoo  = NULL, *last_t = NULL;
 	btg_geometry *geo     = NULL, *last_g = NULL;
 
 	if ((elem = malloc(sizeof(*elem))) == NULL) {
@@ -45,26 +40,16 @@ btg_element *read_element (FILE *f, btg_base *base, unsigned int ver, unsigned c
 	switch (type) {
 
 		case OBJ_BS:
+			printf("read BS ... (%d)\n", elem->num_bytes);
 			if (elem->num_bytes % 28) {
 				fprintf(stderr, "byte counter in bounding sphere isn't correct! break.\n");
 				free_element(elem, type);
 				return NULL;
 			}
 			elem->count = elem->num_bytes / 28;
-			for (i = 0 ; i < elem->count ; i++) {
-				if ((bsphere = read_bsphere(f, base, ver, i)) == NULL) {
-					free_element(elem, type);
-					return NULL;
-				}
-				if (last_b) {
-					last_b->next = bsphere;
-					last_b = last_b->next;
-				}
-				else {
-					base->bsphere = elem->element = last_b = bsphere;
-				}
-			}
-			printf("%d bounding sphere ...\n", i);
+			printf("read BS ...\n");
+			res = read_bsphere (f, base, ver, elem);
+			printf("%d bounding sphere ...\n", res);
 			break;
 
 		case OBJ_VERTEX:
@@ -79,20 +64,8 @@ btg_element *read_element (FILE *f, btg_base *base, unsigned int ver, unsigned c
 				free_element(elem, type);
 				return NULL;
 			}
-			for (i = 0 ; i < elem->count ; i++) {
-				if ((vertex = read_vertex(f, base, ver, i)) == NULL) {
-					free_element(elem, type);
-					return NULL;
-				}
-				if (last_v) {
-					last_v->next = vertex;
-					last_v = last_v->next;
-				}
-				else {
-					base->vertex = elem->element = last_v = vertex;
-				}
-			}
-			printf("%d vertex ...\n", i);
+			res = read_vertex(f, base, ver, elem);
+			printf("%d vertex ...\n", res);
 			break;
 
 		case OBJ_NORMAL:
@@ -107,20 +80,9 @@ btg_element *read_element (FILE *f, btg_base *base, unsigned int ver, unsigned c
 				free_element(elem, type);
 				return NULL;
 			}
-			for (i = 0 ; i < elem->count ; i++) {
-				if ((normal = read_normal(f, base, ver, i)) == NULL) {
-					free_element(elem, type);
-					return NULL;
-				}
-				if (last_n) {
-					last_n->next = normal;
-					last_n = last_n->next;
-				}
-				else {
-					base->normal = elem->element = last_n = normal;
-				}
-			}
-			printf("%d normal ...\n", i);
+
+			res = read_normal(f, base, ver, elem);
+			printf("%d normal ...\n", res);
 			break;
 
 		case OBJ_COLOR:
@@ -135,20 +97,8 @@ btg_element *read_element (FILE *f, btg_base *base, unsigned int ver, unsigned c
 				free_element(elem, type);
 				return NULL;
 			}
-			for (i = 0 ; i < elem->count ; i++) {
-				if ((color = read_color(f, base, ver, i)) == NULL) {
-					free_element(elem, type);
-					return NULL;
-				}
-				if (last_c) {
-					last_c->next = color;
-					last_c = last_c->next;
-				}
-				else {
-					base->color = elem->element = last_c = color;
-				}
-			}
-			printf("%d color ...\n", i);
+			res = read_color(f, base, ver, elem);
+			printf("%d color ...\n", res);
 			break;
 
 		case OBJ_TEXCOO:
@@ -163,20 +113,8 @@ btg_element *read_element (FILE *f, btg_base *base, unsigned int ver, unsigned c
 				free_element(elem, type);
 				return NULL;
 			}
-			for (i = 0 ; i < elem->count ; i++) {
-				if ((texcoo = read_texcoo(f, base, ver, i)) == NULL) {
-					free_element(elem, type);
-					return NULL;
-				}
-				if (last_t) {
-					last_t->next = texcoo;
-					last_t = last_t->next;
-				}
-				else {
-					base->texcoo = elem->element = last_t = texcoo;
-				}
-			}
-			printf("%d texture coordinate ...\n", i);
+			res = read_texcoo(f, base, ver, elem);
+			printf("%d texture coordinate ...\n", res);
 			break;
 
 		case OBJ_POINTS:
@@ -221,146 +159,118 @@ btg_element *read_element (FILE *f, btg_base *base, unsigned int ver, unsigned c
 	return elem;
 }
 
+unsigned int count_element (btg_element *elem, unsigned char type) {
 
+	unsigned int count = 0;
 
-int write_element (FILE *f, btg_element  *elem, unsigned int ver, unsigned char type, unsigned char mask, char *material) {
+	while (elem) {
+		if (elem->valid) {
+			elem->count = 0;
+			switch (type) {
+				case OBJ_BS:
+					if ((elem->count = count_bsphere (elem->element))) count++;
+					break;
+				case OBJ_VERTEX:
+					if ((elem->count = count_vertex (elem->element))) count++;
+					break;
+				case OBJ_NORMAL:
+					if ((elem->count = count_normal (elem->element))) count++;
+					break;
+				case OBJ_COLOR:
+					if ((elem->count = count_color (elem->element))) count++;
+					break;
+				case OBJ_TEXCOO:
+					if ((elem->count = count_texcoo (elem->element))) count++;
+					break;
+				case OBJ_POINTS:
+				case OBJ_TRIS:
+				case OBJ_STRIPE:
+				case OBJ_FAN:
+					if ((elem->count = count_geometry (elem->element))) count++;
+					break;
+			}
+		}
+		elem = elem->next;
+	}
+
+	return count;
+}
+
+int write_element (FILE *f, btg_element *elem, unsigned int ver, unsigned char type, unsigned char mask) {
 
 	int i = 0, num;
-	btg_bsphere  *bsphere = NULL;
-	btg_vertex   *vertex  = NULL;
-	btg_normal   *normal  = NULL;
-	btg_color    *color   = NULL;
-	btg_texcoo   *texcoo  = NULL;
-	btg_geometry *geo     = NULL;
 
-	if (elem->valid) {
-		switch (type) {
-			case OBJ_BS:
-				elem->count = 0;
-				bsphere = elem->element;
-				while (bsphere) {
-					if (bsphere->valid) elem->count++;
-					bsphere = bsphere->next;
-				}
-				elem->num_bytes = elem->count * 28;
-				if (write_uint(f, &elem->num_bytes)) return 1;
-
-				bsphere = elem->element;
-				while (bsphere) {
-					if (bsphere->valid) {
-						if (write_bsphere(f, bsphere, ver)) return 2;
+	while (elem) {
+		if (elem->valid) {
+			switch (type) {
+				case OBJ_BS:
+//					printf("bsphere num: %d\n", elem->count);
+					if (elem->count) {
+						elem->num_bytes = elem->count * 28;
+						if (write_uint(f, &elem->num_bytes)) return 1;
+						if (write_bsphere (f, elem->element, ver)) return 2;
 					}
-					bsphere = bsphere->next;
-				}
-				break;
+					break;
 
-			case OBJ_VERTEX:
-				elem->count = 0;
-				vertex = elem->element;
-				while (vertex) {
-					if (vertex->valid) elem->count++;
-					vertex = vertex->next;
-				}
-				elem->num_bytes = elem->count * 12;
-				if (write_uint(f, &elem->num_bytes)) return 1;
-
-				vertex = elem->element;
-				while (vertex) {
-					if (vertex->valid) {
-						if (write_vertex(f, vertex, ver)) return 2;
+				case OBJ_VERTEX:
+//					printf("vertex num: %d\n", elem->count);
+					if (elem->count) {
+						elem->num_bytes = elem->count * 12;
+						if (write_uint(f, &elem->num_bytes)) return 1;
+						if (write_vertex(f, elem->element, ver)) return 2;
 					}
-					vertex = vertex->next;
-				}
-				break;
+					break;
 
-			case OBJ_NORMAL:
-				elem->count = 0;
-				normal = elem->element;
-				while (normal) {
-					if (normal->valid) elem->count++;
-					normal = normal->next;
-				}
-				elem->num_bytes = elem->count * 3;
-				if (write_uint(f, &elem->num_bytes)) return 1;
-
-				normal = elem->element;
-				while (normal) {
-					if (normal->valid) {
-						if (write_normal(f, normal, ver)) return 2;
+				case OBJ_NORMAL:
+//					printf("normal num: %d\n", elem->count);
+					if (elem->count) {
+						elem->num_bytes = elem->count * 3;
+						if (write_uint(f, &elem->num_bytes)) return 1;
+						if (write_normal(f, elem->element, ver)) return 2;
 					}
-					normal = normal->next;
-				}
-				break;
+					break;
 
-			case OBJ_COLOR:
-				elem->count = 0;
-				color = elem->element;
-				while (color) {
-					if (color->valid) elem->count++;
-					color = color->next;
-				}
-				elem->num_bytes = elem->count * 16;
-				if (write_uint(f, &elem->num_bytes)) return 1;
-
-				color = elem->element;
-				while (color) {
-					if (color->valid) {
-						if (write_color(f, color, ver)) return 2;
+				case OBJ_COLOR:
+//					printf("color num: %d\n", elem->count);
+					if (elem->count) {
+						elem->num_bytes = elem->count * 16;
+						if (write_uint(f, &elem->num_bytes)) return 1;
+						if (write_color(f, elem->element, ver)) return 2;
 					}
-					color = color->next;
-				}
-				break;
+					break;
 
-			case OBJ_TEXCOO:
-				elem->count = 0;
-				texcoo = elem->element;
-				while (texcoo) {
-					if (texcoo->valid) elem->count++;
-					texcoo = texcoo->next;
-				}
-				elem->num_bytes = elem->count * 8;
-				if (write_uint(f, &elem->num_bytes)) return 1;
-
-				texcoo = elem->element;
-				while (texcoo) {
-					if (texcoo->valid) {
-						if (write_texcoo(f, texcoo, ver)) return 2;
+				case OBJ_TEXCOO:
+//					printf("texcoo num: %d\n", elem->count);
+					if (elem->count) {
+						elem->num_bytes = elem->count * 8;
+						if (write_uint(f, &elem->num_bytes)) return 1;
+						if (write_texcoo(f, elem->element, ver)) return 2;
 					}
-					texcoo = texcoo->next;
-				}
-				break;
+					break;
 
-			case OBJ_POINTS:
-			case OBJ_TRIS:
-			case OBJ_STRIPE:
-			case OBJ_FAN:
-				num = 0;
-				for (i = 0 ; i < 4 ; i++) {
-					if (mask & (1 << i)) num++;
-				}
-				elem->count = 0;
-				geo = elem->element;
-				while (geo) {
-					if (geo->valid) elem->count++;
-					geo = geo->next;
-				}
-				if (ver == 7 ) elem->num_bytes = elem->count * (2 * num);
-				if (ver == 10) elem->num_bytes = elem->count * (4 * num);
-				if (write_uint(f, &elem->num_bytes)) return 1;
-
-				geo = elem->element;
-				while (geo) {
-					if (geo->valid) {
-						if (write_geometry(f, geo, ver, mask)) return 2;
+				case OBJ_POINTS:
+				case OBJ_TRIS:
+				case OBJ_STRIPE:
+				case OBJ_FAN:
+					num = 0;
+					for (i = 0 ; i < 4 ; i++) {
+						if (mask & (1 << i)) num++;
 					}
-					geo = geo->next;
-				}
-				break;
+//					printf("geometry num: %d\n", elem->count);
+					if (elem->count) {
+						if (ver == 7 ) elem->num_bytes = elem->count * (2 * num);
+						if (ver == 10) elem->num_bytes = elem->count * (4 * num);
+						if (write_uint(f, &elem->num_bytes)) return 1;
+						if (write_geometry(f, elem->element, ver, mask)) return 2;
+					}
+					break;
 
-			default:
-				fprintf(stderr, "unknown object type %d\n", type);
-				break;
+				default:
+					fprintf(stderr, "unknown object type %d\n", type);
+					break;
+			}
 		}
+		elem = elem->next;
 	}
 
 	return 0;
@@ -400,4 +310,24 @@ void free_element(btg_element *elem, unsigned char type) {
 		free(elem);
 		elem = temp;
 	}
+}
+
+
+
+btg_element *new_element (void) {
+
+	btg_element *elem = NULL;
+
+	if ((elem = malloc(sizeof(*elem))) == NULL) {
+		fprintf(stderr, "No memory left for element! break.\n");
+		return NULL;
+	}
+
+	elem->valid = 1;
+	elem->num_bytes = 0;
+	elem->count = 0;
+	elem->element = NULL;
+	elem->next = NULL;
+
+	return elem;
 }

@@ -8,14 +8,19 @@
 #include "vertex.h"
 #include "triangle.h"
 
-btg_edge *rec_edge (btg_base *base, btg_vertex *v0, btg_vertex *v1, btg_triangle *triangle) {
+btg_edge *rec_edge (btg_edge **all, btg_edge **last, btg_vertex *v0, btg_vertex *v1, btg_triangle *triangle) {
 
 	int i;
 	btg_vertex *temp;
 	btg_edge *edge = NULL;
 
-	if (base == NULL) {
-		fprintf(stderr, "rec_edge: pointer to base is NULL! break.\n");
+	if (all == NULL) {
+		fprintf(stderr, "rec_edge: pointer to all is NULL! break.\n");
+		return NULL;
+	}
+
+	if (last == NULL) {
+		fprintf(stderr, "rec_edge: pointer to last is NULL! break.\n");
 		return NULL;
 	}
 
@@ -40,7 +45,7 @@ btg_edge *rec_edge (btg_base *base, btg_vertex *v0, btg_vertex *v1, btg_triangle
 		v1 = temp;
 	}
 
-	edge = base->edge;
+	edge = *all;
 	if (edge) {
 		while (edge) {
 			if (edge->vertex[0] == v0 && edge->vertex[1] == v1) {
@@ -69,11 +74,9 @@ btg_edge *rec_edge (btg_base *base, btg_vertex *v0, btg_vertex *v1, btg_triangle
 	edge->count = 1;
 	edge->mark = 0;
 	edge->next = NULL;
-	if (base->edge) {
-		base->edge_last->next = edge;
-		base->edge_last = edge;
-	}
-	else base->edge = base->edge_last = edge;
+	if (*all) (*last)->next = edge;
+	else *all = edge;
+	*last = edge;
 
 	return edge;
 }
@@ -186,11 +189,14 @@ int check_edges (btg_base *base, btg_edge *edge) {
 	return error;
 }
 
-btg_fence *collect_border (btg_edge *edge) {
+btg_fence *collect_border (btg_edge **edge) {
 
-	int e1 = 0, e2 = 0, er = 0;
+	int e1 = 0, e2 = 0, er = 0, found;
+	btg_edge *now = NULL, *prev = NULL;
 	btg_border *new = NULL, *last = NULL;
 	btg_fence *fence = NULL;
+
+	now = *edge;
 
 	if ((fence = malloc(sizeof (*fence))) == NULL) {
 		fprintf(stderr, "no memory left for fence!\n");
@@ -201,58 +207,69 @@ btg_fence *collect_border (btg_edge *edge) {
 	fence->border = NULL;
 	fence->next = NULL;
 
-	while (edge) {
-		if (edge->count < 0) {
+	while (now) {
+		found = 0;
+		if (now->count < 0) {
 			fprintf(stderr, "edge usage below 0 !!!\n");
 		}
-		else if (edge->count == 0) {
+		else if (now->count == 0) {
 			fprintf(stderr, "unused edge !!!\n");
 		}
-		else if (edge->count == 1) {
+		else if (now->count == 1) {
 			if ((new = malloc(sizeof (*new))) == NULL) {
 				fprintf(stderr, "no memory left for border!\n");
 				return fence;
 			}
-			new->edge = edge;
+			new->edge = now;
 			new->side = 0;
 			new->vertex = NULL;
 			new->neighbour = NULL;
 			new->tile = NULL;
 			new->next = NULL;
-			if (last) {
-				last->next = new;
-				last = last->next;
-			}
-			else {
-				fence->border = last = new;
-			}
+			if (last) last->next = new;
+			else fence->border = new;
+			last = new;
+			found++;
+
 			if (fence->turn) {
-				fence->min_x = edge->vertex[0]->projection.x;
-				fence->max_x = edge->vertex[0]->projection.x;
-				fence->min_y = edge->vertex[0]->projection.y;
-				fence->max_y = edge->vertex[0]->projection.y;
+				fence->min_x = now->vertex[0]->projection.x;
+				fence->max_x = now->vertex[0]->projection.x;
+				fence->min_y = now->vertex[0]->projection.y;
+				fence->max_y = now->vertex[0]->projection.y;
 				fence->turn = 0;
 			}
-			if (edge->vertex[0]->projection.x < fence->min_x) fence->min_x = edge->vertex[0]->projection.x;
-			if (edge->vertex[0]->projection.x > fence->max_x) fence->max_x = edge->vertex[0]->projection.x;
-			if (edge->vertex[0]->projection.y < fence->min_y) fence->min_y = edge->vertex[0]->projection.y;
-			if (edge->vertex[0]->projection.y < fence->max_y) fence->max_y = edge->vertex[0]->projection.y;
-			if (edge->vertex[1]->projection.x < fence->min_x) fence->min_x = edge->vertex[1]->projection.x;
-			if (edge->vertex[1]->projection.x > fence->max_x) fence->max_x = edge->vertex[1]->projection.x;
-			if (edge->vertex[1]->projection.y < fence->min_y) fence->min_y = edge->vertex[1]->projection.y;
-			if (edge->vertex[1]->projection.y < fence->max_y) fence->max_y = edge->vertex[1]->projection.y;
+			if (now->vertex[0]->projection.x < fence->min_x) fence->min_x = now->vertex[0]->projection.x;
+			if (now->vertex[0]->projection.x > fence->max_x) fence->max_x = now->vertex[0]->projection.x;
+			if (now->vertex[0]->projection.y < fence->min_y) fence->min_y = now->vertex[0]->projection.y;
+			if (now->vertex[0]->projection.y < fence->max_y) fence->max_y = now->vertex[0]->projection.y;
+			if (now->vertex[1]->projection.x < fence->min_x) fence->min_x = now->vertex[1]->projection.x;
+			if (now->vertex[1]->projection.x > fence->max_x) fence->max_x = now->vertex[1]->projection.x;
+			if (now->vertex[1]->projection.y < fence->min_y) fence->min_y = now->vertex[1]->projection.y;
+			if (now->vertex[1]->projection.y < fence->max_y) fence->max_y = now->vertex[1]->projection.y;
 			e1++;
 		}
-		else if (edge->count == 2) e2++;
-		else if (edge->count > 2) {
+		else if (now->count == 2) e2++;
+		else if (now->count > 2) {
 			er++;
-			fprintf(stderr, "edge usage is %d!!!\n", edge->count);
-			fprintf(stderr, "%f,%f,%f\n", edge->vertex[0]->absolute.x, edge->vertex[0]->absolute.y, edge->vertex[0]->absolute.z);
-			fprintf(stderr, "%f,%f,%f\n", edge->vertex[1]->absolute.x, edge->vertex[1]->absolute.y, edge->vertex[1]->absolute.z);
+			fprintf(stderr, "edge usage is %d!!!\n", now->count);
+			fprintf(stderr, "%f,%f,%f\n", now->vertex[0]->absolute.x, now->vertex[0]->absolute.y, now->vertex[0]->absolute.z);
+			fprintf(stderr, "%f,%f,%f\n", now->vertex[1]->absolute.x, now->vertex[1]->absolute.y, now->vertex[1]->absolute.z);
 		}
-		edge = edge->next;
+		if (found) {
+			if (prev) prev->next = now->next;
+			else *edge = now->next;
+		}
+		else prev = now;
+		now = now->next;
 	}
-	printf("Edges 1: %d / 2: %d / error: %d\n", e1, e2, er);
+
+	if (fence->border == NULL) {
+		free (fence);
+		fence = NULL;
+	}
+	else {
+		printf("Edges 1: %d / 2: %d / error: %d\n", e1, e2, er);
+	}
 
 	return fence;
 }
@@ -536,7 +553,7 @@ int check_vectorline (btg_fence *fence, short aspect) {
 	return 0;
 }
 
-btg_fence *examine_fence (btg_fence *fence, btg_base *base) {
+btg_fence *examine_fence (btg_fence *fence, btg_base *basex) {
 
 	int left_side = 0, right_side = 0;
 	btg_border *last = NULL, *now = NULL;
@@ -544,7 +561,7 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *base) {
 	btg_edge edge_res;
 	double len;
 
-	if (base == NULL) {
+	if (basex == NULL) {
 		fprintf(stderr, "examine_fence: pointer to base is NULL! exit.\n");
 		return NULL;
 	}
@@ -612,15 +629,15 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *base) {
 				}
 				else if (right_side > 0 && left_side == 0) {
 					printf("examine_fence: fence is a hole!\n");
-					if ((fence->max_x - fence->min_x) < base->holesize && (fence->max_y - fence->min_y) < base->holesize) {
+					if ((fence->max_x - fence->min_x) < basex->holesize && (fence->max_y - fence->min_y) < basex->holesize) {
 						printf("examine_fence: close it!\n");
-						close_hole (fence, base);
+						close_hole (fence, basex);
 						return NULL;
 					}
 				}
 				else {
 					if (check_vectorline(fence, USE_PROJECTION)) {
-						close_hole (fence, base);
+						close_hole (fence, basex);
 						return NULL;
 					}
 				}
@@ -631,7 +648,7 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *base) {
 				len = pydacoras(edge_res.vertex[0], edge_res.vertex[1], USE_RELATIVE);
 				if (len < 0.10) {
 					printf("examine_fence: collaps vertex %f\n", len);
-					collaps_vertices (edge_res.vertex[0], edge_res.vertex[1], base);
+					collaps_vertices (edge_res.vertex[0], edge_res.vertex[1], basex);
 					free_border (fence->border);
 					free (fence);
 					return NULL;
@@ -650,15 +667,15 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *base) {
 				}
 				else if (left_side > 0 && right_side == 0) {
 					printf("examine_fence: fence is a hole!\n");
-					if ((fence->max_x - fence->min_x) < base->holesize && (fence->max_y - fence->min_y) < base->holesize) {
+					if ((fence->max_x - fence->min_x) < basex->holesize && (fence->max_y - fence->min_y) < basex->holesize) {
 						printf("examine_fence: close it!\n");
-						close_hole (fence, base);
+						close_hole (fence, basex);
 						return NULL;
 					}
 				}
 				else {
 					if (check_vectorline(fence, USE_PROJECTION)) {
-						close_hole (fence, base);
+						close_hole (fence, basex);
 						return NULL;
 					}
 				}
@@ -669,7 +686,7 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *base) {
 				len = pydacoras(edge_res.vertex[0], edge_res.vertex[1], USE_RELATIVE);
 				if (len < 0.10) {
 					printf("examine_fence: collaps vertex %f\n", len);
-					collaps_vertices (edge_res.vertex[0], edge_res.vertex[1], base);
+					collaps_vertices (edge_res.vertex[0], edge_res.vertex[1], basex);
 					free_border (fence->border);
 					free (fence);
 					return NULL;
@@ -688,7 +705,7 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *base) {
 		len = pydacoras(edge_res.vertex[0], edge_res.vertex[1], USE_RELATIVE);
 		if (len < 0.25) {
 			printf("examine_fence: collaps vertex %f\n", len);
-			collaps_vertices (edge_res.vertex[0], edge_res.vertex[1], base);
+			collaps_vertices (edge_res.vertex[0], edge_res.vertex[1], basex);
 /*
 			free_border (fence->border);
 			free (fence);

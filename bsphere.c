@@ -4,50 +4,70 @@
 #include "coord.h"
 #include "raw.h"
 
-btg_bsphere *read_bsphere (FILE *f, btg_base *base, unsigned int ver, int index) {
+int read_bsphere (FILE *f, btg_base *base, unsigned int ver, btg_element *elem) {
 
-	btg_bsphere *new = NULL;
+	int index = 0;
+	btg_bsphere *new = NULL, *last = NULL;
 	coord_geo geo;
 	coord_cart cart;
 
 	if (base == NULL) {
 		fprintf(stderr, "pointer to base is NULL! break.\n");
-		return NULL;
+		return -1;
 	}
 
-	if ((new = malloc(sizeof(*new))) == NULL) {
-		fprintf(stderr, "No memory left for bounding sphere! break.\n");
-		return NULL;
+	for (index = 0 ; index < elem->count ; index++) {
+		if ((new = malloc(sizeof(*new))) == NULL) {
+			fprintf(stderr, "No memory left for bounding sphere! break.\n");
+			return -1;
+		}
+		new->next = NULL;
+		new->valid = 1;
+		new->index = index;
+		new->count = 1;
+
+		if (read_double(f, &new->coord.x)) printf("double Ooops\n");
+		if (read_double(f, &new->coord.y)) printf("double Ooops\n");
+		if (read_double(f, &new->coord.z)) printf("double Ooops\n");
+		if (read_float (f, &new->r))       printf("float Ooops\n");
+
+		cart.x = new->coord.x;
+		cart.y = new->coord.y;
+		cart.z = new->coord.z;
+		geo = cart2geo (cart);
+		new->lat = geo.lat;
+		new->lon = geo.lon;
+
+		if (last) last->next = new;
+		else base->bsphere = elem->element = new;
+		last = new;
 	}
-	new->next = NULL;
-	new->valid = 1;
-	new->index = index;
-	new->count = 1;
+	return index;
+}
 
-	if (read_double(f, &new->coord.x)) printf("double Ooops\n");
-	if (read_double(f, &new->coord.y)) printf("double Ooops\n");
-	if (read_double(f, &new->coord.z)) printf("double Ooops\n");
-	if (read_float (f, &new->r)) printf("float Ooops\n");
+unsigned int count_bsphere (btg_bsphere *bsphere) {
 
-	cart.x = new->coord.x;
-	cart.y = new->coord.y;
-	cart.z = new->coord.z;
-	geo = cart2geo (cart);
-	new->lat = geo.lat;
-	new->lon = geo.lon;
+	int count = 0;
 
-	return new;
+	while (bsphere) {
+		if (bsphere->valid) count++;
+		bsphere = bsphere->next;
+	}
+
+	return count;
 }
 
 int write_bsphere (FILE *f, btg_bsphere *bsphere, unsigned int ver) {
-
-	if (bsphere->valid) {
-		if (write_double(f, &bsphere->coord.x)) return 1;
-		if (write_double(f, &bsphere->coord.y)) return 2;
-		if (write_double(f, &bsphere->coord.z)) return 3;
-		if (write_float (f, &bsphere->r)) return 4;
+	while (bsphere) {
+		if (bsphere->valid) {
+			printf("write bsphere ...\n");
+			if (write_double(f, &bsphere->coord.x)) return 1;
+			if (write_double(f, &bsphere->coord.y)) return 2;
+			if (write_double(f, &bsphere->coord.z)) return 3;
+			if (write_float (f, &bsphere->r)) return 4;
+		}
+		bsphere = bsphere->next;
 	}
-
 	return 0;
 }
 

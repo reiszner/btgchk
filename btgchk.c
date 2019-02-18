@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
 
 	FILE *infile = NULL, *outfile = NULL;
 	char fullpath[PATH_MAX] = {"\0"}, basepath[PATH_MAX] = {"\0"}, filename[PATH_MAX] = {"\0"}, file[PATH_MAX] = {"\0"};
-	char index_s[PATH_MAX] = {"\0"}, lat_s[PATH_MAX] = {"\0"}, lon_s[PATH_MAX] = {"\0"}, texture[64] = {"\0"};
+	char index_s[PATH_MAX] = {"\0"}, lat_s[PATH_MAX] = {"\0"}, lon_s[PATH_MAX] = {"\0"}, texture[64] = {"\0"}, rwy_als[PATH_MAX] = {"\0"};
 	int opt, flagp = 0, flaga = 0, flagi = 0, flagl = 0, flagm = 0, flagg = 0, index[5] = {0}, cnt;
 	double holesize = -2.0;
 	btg_header *airport = NULL, *tile[5] = {NULL};
@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 	btg_vertex *v;
 
 
-	while ((opt = getopt(argc, argv, "p:a:i:l:m:h:t:s")) != -1) {
+	while ((opt = getopt(argc, argv, "p:a:i:l:m:h:t:s:r:")) != -1) {
 		switch (opt) {
 			case 'p':
 				strncpy(basepath, optarg, PATH_MAX);
@@ -79,14 +79,27 @@ int main(int argc, char *argv[])
 			case 't':
 				strncpy(texture, optarg, 64);
 				break;
+			case 'r':
+				strcat(rwy_als, optarg);
+				strcat(rwy_als, "/");
+				break;
 			case 'h':
 			default:
 				fprintf(stderr, "Usage: %s -p basepath -a airport\n", argv[0]);
 				fprintf(stderr, "       %s -p basepath -i tileindex\n", argv[0]);
 				fprintf(stderr, "       %s -p basepath -l latitude -m longitude\n", argv[0]);
 				fprintf(stderr, "additional parameters:\n");
-				fprintf(stderr, "          -t texture     a texture for closing holes\n");
-				fprintf(stderr, "          -s meter       the maximum size (in meter) of holes to close\n");
+				fprintf(stderr, "    -s meter            the maximum size (in meter) of holes to close\n");
+				fprintf(stderr, "    -t texture          a texture for closing holes\n");
+				fprintf(stderr, "    -r rwy[=als[@len]]  new approach light system for runway <rwy>\n");
+				fprintf(stderr, "                          with layout <als> and a length of <len> meter\n");
+				fprintf(stderr, "                          possible ALS layouts are:\n");
+				fprintf(stderr, "                            ALSF-I  (default 3000 ft / 900 m)\n");
+				fprintf(stderr, "                            ALSF-II (default 3000 ft / 900 m)\n");
+				fprintf(stderr, "                            SSALR   (default 2400 ft / 720 m)\n");
+				fprintf(stderr, "                            SSALF   (default 1400 ft / 420 m)\n");
+				fprintf(stderr, "                            MALSF   (default 1400 ft / 420 m)\n");
+				fprintf(stderr, "                            MALS    (default 1400 ft / 420 m)\n");
 				return EXIT_FAILURE;
 		}
 	}
@@ -132,13 +145,13 @@ int main(int argc, char *argv[])
 
 		get_airport_path (fullpath, basepath, filename);
 		printf("Path: '%s'\n", fullpath);
-		runway = get_airport_info (fullpath);
+		runway = get_airport_info (fullpath, rwy_als);
 
 		tmp = runway;
 		cnt = 0;
 		geo.lon = 0.0;
 		geo.lat = 0.0;
-		geo.asl = 0.0;
+		geo.msl = 0.0;
 
 		while (tmp) {
 			geo.lon += tmp->threshold[0].lon + tmp->threshold[1].lon;
@@ -159,6 +172,17 @@ int main(int argc, char *argv[])
 				else if (tmp->threshold[0].rwy_ord == 3) printf("R");
 			}
 			printf("\n");
+			if (tmp->threshold[0].als_layout != ALS_NOOP) {
+				printf("        ALS change  : %s @ %d\n",
+			    tmp->threshold[0].als_layout == ALS_ALSF1 ? "ALSF-I" :
+				    tmp->threshold[0].als_layout == ALS_ALSF2 ? "ALSF-II" :
+				    tmp->threshold[0].als_layout == ALS_SSALR ? "SSALR" :
+				    tmp->threshold[0].als_layout == ALS_SSALF ? "SSALF" :
+				    tmp->threshold[0].als_layout == ALS_MALSF ? "MALSF" :
+				    tmp->threshold[0].als_layout == ALS_MALS ? "MALS" :
+				    "delete",
+			    tmp->threshold[0].als_len);
+			}
 
 			printf("    Threshold 2:\n");
 			printf("        Longitude   : %f\n", tmp->threshold[1].lon);
@@ -167,12 +191,23 @@ int main(int argc, char *argv[])
 			printf("        Displacement: %f\n", tmp->threshold[1].displacement);
 			printf("        Stopway     : %f\n", tmp->threshold[1].stopw);
 			printf("        Runway      : %02d", tmp->threshold[1].rwy_num);
-			if (tmp->threshold[0].rwy_ord) {
+			if (tmp->threshold[1].rwy_ord) {
 				if      (tmp->threshold[1].rwy_ord == 1) printf("L");
 				else if (tmp->threshold[1].rwy_ord == 2) printf("C");
 				else if (tmp->threshold[1].rwy_ord == 3) printf("R");
 			}
 			printf("\n");
+			if (tmp->threshold[1].als_layout != ALS_NOOP) {
+				printf("        ALS change  : %s @ %d\n",
+			    tmp->threshold[1].als_layout == ALS_ALSF1 ? "ALSF-I" :
+				    tmp->threshold[1].als_layout == ALS_ALSF2 ? "ALSF-II" :
+				    tmp->threshold[1].als_layout == ALS_SSALR ? "SSALR" :
+				    tmp->threshold[1].als_layout == ALS_SSALF ? "SSALF" :
+				    tmp->threshold[1].als_layout == ALS_MALSF ? "MALSF" :
+				    tmp->threshold[1].als_layout == ALS_MALS ? "MALS" :
+				    "delete",
+			    tmp->threshold[1].als_len);
+			}
 
 			tmp = tmp->next;
 		}
@@ -220,11 +255,9 @@ int main(int argc, char *argv[])
 		cart.y = bs->coord.y;
 		cart.z = bs->coord.z;
 		geo = cart2geo (cart);
-		printf("Lon: %Lf Lat: %Lf ASL: %Lf\n*****\n", (geo.lon * 180.0) / M_PI, (geo.lat * 180.0) / M_PI, geo.asl);
+		printf("Lon: %Lf Lat: %Lf ASL: %Lf\n*****\n", (geo.lon * 180.0) / M_PI, (geo.lat * 180.0) / M_PI, geo.msl);
 		index[0] = geo2index(geo);
 	}
-
-
 
 	if (flagi) {
 		if (index <= 0) {
@@ -239,7 +272,7 @@ int main(int argc, char *argv[])
 		coord_geo geo;
 		geo.lon = (atof(lon_s) * M_PI) / 180.0;
 		geo.lat = (atof(lat_s) * M_PI) / 180.0;
-		geo.asl = 0.0;
+		geo.msl = 0.0;
 		index[0] = geo2index(geo);
 	}
 

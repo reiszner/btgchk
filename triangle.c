@@ -80,7 +80,7 @@ int rec_triangle (btg_base *base, btg_triangle *triangle) {
 		}
 		if (strncmp("lf_", triangle->object->prop_material, 3)) {
 			for (cnt = 0 ; cnt < 3 ; cnt++) {
-				triangle->edge[cnt] = rec_edge (base, corner[cnt], corner[(cnt + 1) % 3], triangle);
+				triangle->edge[cnt] = rec_edge (&base->edge, &base->edge_last, corner[cnt], corner[(cnt + 1) % 3], triangle);
 			}
 		}
 		triangle->elem->valid = 1;

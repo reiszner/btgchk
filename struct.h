@@ -96,10 +96,12 @@ typedef struct btg_element_s {
 #define OBJ_TRIS         10    // Individual Triangles
 #define OBJ_STRIPE       11    // Triangle Strips
 #define OBJ_FAN          12    // Triangle Fans
+#define OBJ_UNSET       255    // not set
 
 #define PROP_MAT          0    // Material
 #define PROP_INDEX        1    // Index Types
 
+#define MASK_UNSET     0x00
 #define MASK_VERTEX    0x01
 #define MASK_NORMAL    0x02
 #define MASK_COLOR     0x04
@@ -114,12 +116,19 @@ typedef struct btg_object_s {
 	unsigned int  elem_cnt;
 	unsigned char prop_mask;
 	char *prop_material;
-	btg_element  *elem_list;
+	btg_element *elem_list;
 	struct btg_object_s *next;
 } btg_object;
 
+typedef struct vector_s {
+	double x;
+	double y;
+	double z;
+} vector;
+
 typedef struct btg_point_s {
-	char *material;
+	short valid;
+	btg_object *object;
 	btg_geometry *geo;
 	struct btg_point_s *next;
 } btg_point;
@@ -146,6 +155,21 @@ typedef struct btg_trialist_s {
 	struct btg_trialist_s *next;
 } btg_trialist;
 
+#define ALS_NOOP     -1   // leave it untouched
+#define ALS_CLEAR     0   // delete ALS lights
+// long ALS (default length: 3000ft / 900m)
+#define ALS_ALSF1     1   // strong lights (PAR56) with flasher (PAR56)
+#define ALS_ALSF2     2   // strong lights (PAR56) with flasher (PAR56)
+// medium ALS (default length: 2400ft / 720m)
+#define ALS_SSALS     3   // strong lights (PAR56)
+#define ALS_SSALR     4   // strong lights (PAR56) with RAIL (PAR56)
+#define ALS_SSALF     5   // strong lights (PAR56) with flasher (PAR56)
+// short ALS (default length: 1400ft / 420m)
+#define ALS_MALS      6   // medium lights (PAR38)
+#define ALS_MALSR     7   // medium lights (PAR38) with RAIL (PAR56)
+#define ALS_MALSF     8   // medium lights (PAR38) with flasher (PAR56)
+
+
 typedef struct threshold_info_s {
 	double lon;
 	double lat;
@@ -154,6 +178,9 @@ typedef struct threshold_info_s {
 	double stopw;
 	char rwy_num;
 	char rwy_ord;
+	int als_layout;
+	int als_len;
+	btg_vertex *origin;
 } threshold_info;
 
 typedef struct runway_info_s {

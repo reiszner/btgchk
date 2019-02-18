@@ -3,44 +3,65 @@
 #include "color.h"
 #include "raw.h"
 
-btg_color *read_color (FILE *f, btg_base *base, unsigned int ver, int index) {
+int read_color (FILE *f, btg_base *base, unsigned int ver, btg_element *elem) {
 
-	btg_color *new = NULL;
+	int index;
+	btg_color *new = NULL, *last = NULL;
 
 	if (base == NULL) {
 		fprintf(stderr, "pointer to base is NULL! break.\n");
-		return NULL;
+		return -1;
 	}
 
-	if ((new = malloc(sizeof(*new))) == NULL) {
-		fprintf(stderr, "No memory left for color! break.\n");
-		return NULL;
+	for (index = 0 ; index < elem->count ; index++) {
+		if ((new = malloc(sizeof(*new))) == NULL) {
+			fprintf(stderr, "No memory left for color! break.\n");
+			return -1;
+		}
+
+		new->next = NULL;
+		new->valid = 1;
+		new->index = index;
+		new->count = 0;
+		new->alias = NULL;
+
+		base->color_array[index] = new;
+
+		if (read_float(f, &new->r)) printf("float Ooops\n");
+		if (read_float(f, &new->g)) printf("float Ooops\n");
+		if (read_float(f, &new->b)) printf("float Ooops\n");
+		if (read_float(f, &new->a)) printf("float Ooops\n");
+
+		if (last) last->next = new;
+		else base->color = elem->element = new;
+		last = new;
 	}
-	new->next = NULL;
-	new->valid = 1;
-	new->index = index;
-	new->count = 0;
-	new->alias = NULL;
 
-	base->color_array[index] = new;
+	return index;
+}
 
-	if (read_float(f, &new->r)) printf("float Ooops\n");
-	if (read_float(f, &new->g)) printf("float Ooops\n");
-	if (read_float(f, &new->b)) printf("float Ooops\n");
-	if (read_float(f, &new->a)) printf("float Ooops\n");
+unsigned int count_color (btg_color *color) {
 
-	return new;
+	int count = 0;
+
+	while (color) {
+		if (color->valid) count++;
+		color = color->next;
+	}
+
+	return count;
 }
 
 int write_color (FILE *f, btg_color *color, unsigned int ver) {
-
-	if (color->valid) {
-		if (write_float(f, &color->r)) return 1;
-		if (write_float(f, &color->g)) return 2;
-		if (write_float(f, &color->b)) return 3;
-		if (write_float(f, &color->a)) return 4;
+	while (color) {
+		if (color->valid) {
+			if (write_float(f, &color->r)) return 1;
+			if (write_float(f, &color->g)) return 2;
+			if (write_float(f, &color->b)) return 3;
+			if (write_float(f, &color->a)) return 4;
+		}
+		color = color->next;
 	}
-
 	return 0;
 }
 

@@ -87,8 +87,6 @@ int read_btg (FILE *f, btg_header **header) {
 
 int write_btg (FILE *f, btg_header *header) {
 
-	btg_object *obj = NULL;
-
 	if (header == NULL) {
 		fprintf(stderr, "pointer to header is NULL! exit.\n");
 		return 1;
@@ -98,14 +96,10 @@ int write_btg (FILE *f, btg_header *header) {
 		fprintf(stderr, "Problem while writing header! exit.\n");
 		return 2;
 	}
-	obj = header->object;
 
-	while (obj) {
-		if (write_object (f, obj, header->version)) {
-			fprintf(stderr, "problem while reading objects!\n");
-			return 3;
-		}
-		obj = obj->next;
+	if (write_object (f, header->object, header->version)) {
+		fprintf(stderr, "problem while writing objects!\n");
+		return 3;
 	}
 
 	return 0;

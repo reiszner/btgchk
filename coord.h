@@ -16,7 +16,7 @@
 typedef struct coord_geo_s {
 	long double lat;
 	long double lon;
-	long double asl;
+	long double msl;
 } coord_geo;
 
 typedef struct coord_cart_s {

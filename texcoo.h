@@ -7,7 +7,8 @@
 
 #define TEXCOO_PRECITION 0.0001
 
-btg_texcoo *read_texcoo (FILE *f, btg_base *base, unsigned int ver, int index);
+int read_texcoo (FILE *f, btg_base *base, unsigned int ver, btg_element *elem);
+unsigned int count_texcoo (btg_texcoo *texcoo);
 int write_texcoo (FILE *f, btg_texcoo *texcoo, unsigned int ver);
 void free_texcoo (btg_texcoo *texcoo);
 

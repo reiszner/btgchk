@@ -96,23 +96,17 @@ int read_header (FILE *f, btg_header **head) {
 
 int write_header (FILE *f, btg_header *head) {
 
-	unsigned int cr, num = 0;
+	unsigned int cr;
 	unsigned short cnt = 0;
-	btg_object *obj;
 
 	if (head == NULL) {
 		fprintf(stderr, "pointer to header is NULL! exit.\n");
 		return 1;
 	}
 
-	obj = head->object;
-	while (obj) {
-		num++;
-		obj = obj->next;
-	}
-	head->num_object = num;
-
+	head->num_object = count_object(head->object);
 	printf("write Header ...\n");
+	printf("header has %d objects ...\n", head->num_object);
 
 	if (write_ushort(f, &head->version)) return 1;
 	if (write_ushort(f, &head->mag_num)) return 2;

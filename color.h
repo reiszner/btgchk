@@ -5,7 +5,8 @@
 
 #include "struct.h"
 
-btg_color *read_color (FILE *f, btg_base *base, unsigned int ver, int index);
+int read_color (FILE *f, btg_base *base, unsigned int ver, btg_element *elem);
+unsigned int count_color (btg_color *color);
 int write_color (FILE *f, btg_color *color, unsigned int ver);
 void free_color (btg_color *color);
 

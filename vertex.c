@@ -7,49 +7,69 @@
 #include "raw.h"
 #include "coord.h"
 
-btg_vertex *read_vertex (FILE *f, btg_base *base, unsigned int ver, int index) {
+int read_vertex (FILE *f, btg_base *base, unsigned int ver, btg_element *elem) {
 
-	btg_vertex *new = NULL;
+	int index;
+	btg_vertex *new = NULL, *last = NULL;
 
 	if (base == NULL) {
 		fprintf(stderr, "pointer to base is NULL! break.\n");
-		return NULL;
+		return -1;
 	}
 
-	if ((new = malloc(sizeof(*new))) == NULL) {
-		fprintf(stderr, "No memory left for vertex! break.\n");
-		return NULL;
+	for (index = 0 ; index < elem->count ; index++) {
+		if ((new = malloc(sizeof(*new))) == NULL) {
+			fprintf(stderr, "No memory left for vertex! break.\n");
+			return -1;
+		}
+		new->next = NULL;
+		new->projection.x = 0.0;
+		new->projection.y = 0.0;
+		new->projection.z = 0.0;
+		new->valid = 1;
+		new->index = index;
+		new->count = 0;
+		new->alias = NULL;
+
+		base->vertex_array[index] = new;
+
+		if (read_float(f, &new->relative.x)) printf("float Ooops\n");
+		if (read_float(f, &new->relative.y)) printf("float Ooops\n");
+		if (read_float(f, &new->relative.z)) printf("float Ooops\n");
+
+		new->absolute.x = base->bsphere->coord.x + new->relative.x;
+		new->absolute.y = base->bsphere->coord.y + new->relative.y;
+		new->absolute.z = base->bsphere->coord.z + new->relative.z;
+
+		if (last) last->next = new;
+		else base->vertex = elem->element = new;
+		last = new;
 	}
-	new->next = NULL;
-	new->projection.x = 0.0;
-	new->projection.y = 0.0;
-	new->projection.z = 0.0;
-	new->valid = 1;
-	new->index = index;
-	new->count = 0;
-	new->alias = NULL;
 
-	base->vertex_array[index] = new;
+	return index;
+}
 
-	if (read_float(f, &new->relative.x)) printf("float Ooops\n");
-	if (read_float(f, &new->relative.y)) printf("float Ooops\n");
-	if (read_float(f, &new->relative.z)) printf("float Ooops\n");
+unsigned int count_vertex (btg_vertex *vertex) {
 
-	new->absolute.x = base->bsphere->coord.x + new->relative.x;
-	new->absolute.y = base->bsphere->coord.y + new->relative.y;
-	new->absolute.z = base->bsphere->coord.z + new->relative.z;
+	unsigned int count = 0;
 
-	return new;
+	while (vertex) {
+		if (vertex->valid) count++;
+		vertex = vertex->next;
+	}
+
+	return count;
 }
 
 int write_vertex (FILE *f, btg_vertex *vertex, unsigned int ver) {
-
-	if (vertex->valid) {
-		if (write_float(f, &vertex->relative.x)) return 1;
-		if (write_float(f, &vertex->relative.y)) return 2;
-		if (write_float(f, &vertex->relative.z)) return 3;
+	while (vertex) {
+		if (vertex->valid) {
+			if (write_float(f, &vertex->relative.x)) return 1;
+			if (write_float(f, &vertex->relative.y)) return 2;
+			if (write_float(f, &vertex->relative.z)) return 3;
+		}
+		vertex = vertex->next;
 	}
-
 	return 0;
 }
 
@@ -126,11 +146,44 @@ void check_same_vertices (btg_vertex *vertex) {
 
 
 
-double pydacoras (const btg_vertex *v0, const btg_vertex *v1, const short what) {
+btg_vertex *new_vertex (btg_vertex *all) {
+
+	btg_vertex *vertex = NULL;
+
+	if (!all) {
+		fprintf(stderr, "pointer to vertex is NULL! break.\n");
+		return NULL;
+	}
+
+	vertex = all;
+	while (vertex->next) vertex = vertex->next;
+
+	if ((vertex->next = malloc(sizeof(*vertex))) == NULL) {
+		fprintf(stderr, "no memory left for vertex! break.\n");
+		return NULL;
+	}
+
+	vertex = vertex->next;
+	vertex->valid = 1;
+	vertex->index = 0;
+	vertex->count = 0;
+	vertex->absolute.x = vertex->absolute.y = vertex->absolute.z = 0.0;
+	vertex->relative.x = vertex->relative.y = vertex->relative.z = 0.0;
+	vertex->projection.x = vertex->projection.y = vertex->projection.z = 0.0;
+	vertex->alias = NULL;
+	vertex->next = NULL;
+
+	return vertex;
+}
+
+
+
+
+double pydacoras (const btg_vertex *v0, const btg_vertex *v1, const short view) {
 
 	double delta_x, delta_y, delta_z, len;
 
-	switch (what) {
+	switch (view) {
 		case USE_ABSOLUTE:
 			delta_x = v0->absolute.x - v1->absolute.x;
 			delta_y = v0->absolute.y - v1->absolute.y;
@@ -156,26 +209,6 @@ double pydacoras (const btg_vertex *v0, const btg_vertex *v1, const short what) 
 }
 
 
-
-void turnvector (vector *vec, const double lon, const double lat) {
-
-	double len, angle;
-
-	len = sqrt((vec->x * vec->x) + (vec->z * vec->z));
-	angle = asin(vec->z / len);
-	if (vec->x < 0.0) angle = M_PIl - angle;
-	angle += lat;
-	vec->x = cos(angle) * len;
-	vec->z = sin(angle) * len;
-
-	len = sqrt((vec->x * vec->x) + (vec->y * vec->y));
-	angle = asin(vec->y / len);
-	if (vec->x < 0.0) angle = M_PIl - angle;
-	angle += lon;
-	vec->x = cos(angle) * len;
-	vec->y = sin(angle) * len;
-
-}
 
 vector *vertex2vector (btg_vertex *vertex) {
 
@@ -232,9 +265,9 @@ void projection (const btg_bsphere *bsphere, btg_vertex *vertex) {
 	if (phi < bsphere->lat) vertex->projection.y *= -1.0;
 }
 
-vector get_vector (const btg_vertex *v0, const btg_vertex *v1, short what) {
+vector get_vector (const btg_vertex *v0, const btg_vertex *v1, short view) {
 	vector vec;
-	switch (what) {
+	switch (view) {
 
 		case USE_ABSOLUTE:
 			vec.x = v1->absolute.x - v0->absolute.x;

@@ -5,7 +5,8 @@
 
 #include "struct.h"
 
-btg_bsphere *read_bsphere (FILE *f, btg_base *base, unsigned int ver, int index);
+int read_bsphere (FILE *f, btg_base *base, unsigned int ver, btg_element *elem);
+unsigned int count_bsphere (btg_bsphere *bsphere);
 int write_bsphere (FILE *f, btg_bsphere *bsphere , unsigned int ver);
 void free_bsphere (btg_bsphere *bsphere);
 

@@ -3,7 +3,7 @@
 #include "point.h"
 #include "geometry.h"
 
-int add_point (btg_element *elem, btg_base *base, char *material) {
+int add_point (btg_element *elem, btg_base *base, btg_object *object) {
 
 	btg_point *point = NULL;
 	btg_geometry *geo = NULL;
@@ -25,7 +25,8 @@ int add_point (btg_element *elem, btg_base *base, char *material) {
 				fprintf(stderr, "No memory left for point! break.\n");
 				return 3;
 			}
-			point->material = material;
+			point->object = object;
+			point->valid = 1;
 			point->geo = geo;
 			point->next = NULL;
 			if (base->point_last) {
@@ -51,20 +52,14 @@ void free_point (btg_point *point) {
 }
 
 void rec_point (btg_point *point) {
-	btg_geometry *geo = point->geo;
-	while (geo) {
-		unalias_geometry(geo);
-		rec_geometry(geo);
-		geo = geo->next;
-	}
+	unalias_geometry(point->geo);
+	rec_geometry(point->geo);
+	point->valid = 1;
 }
 
 void unrec_point (btg_point *point) {
-	btg_geometry *geo = point->geo;
-	while (geo) {
-		unrec_geometry(geo);
-		geo = geo->next;
-	}
+	unrec_geometry(point->geo);
+	point->valid = 0;
 }
 
 void check_points (btg_point *point_start) {

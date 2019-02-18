@@ -11,6 +11,7 @@
 #include "point.h"
 #include "triangle.h"
 #include "edge.h"
+#include "airport.h"
 
 void remove_unused (btg_header *head) {
 	remove_unused_bspheres (head->base.bsphere);
@@ -38,7 +39,7 @@ int usage (btg_header *header) {
 
 	while (obj) {
 		if (obj->obj_type == OBJ_POINTS) {
-			if (add_point (obj->elem_list, &header->base, obj->prop_material)) {
+			if (add_point (obj->elem_list, &header->base, obj)) {
 				fprintf(stderr, "problem while add points! break.\n");
 				return 1;
 			}
@@ -78,7 +79,7 @@ void check (btg_header *head) {
 
 	fprintf(stdout, "********** collect border **********\n");
 	fprintf(stderr, "********** collect border **********\n");
-	border = collect_border (head->base.edge);
+	border = collect_border (&head->base.edge);
 
 	fprintf(stdout, "********** search fence **********\n");
 	fprintf(stderr, "********** search fence **********\n");
@@ -104,6 +105,13 @@ void check (btg_header *head) {
 	free_border (border->border);
 	free (border);
 	border = NULL;
+
+	if (head->runway) {
+		fprintf(stdout, "********** update runway info **********\n");
+		fprintf(stderr, "********** update runway info **********\n");
+		set_runway_info (&head->base, head->runway);
+		remove_old_als (&head->base, head->object, head->runway);
+	}
 
 	fprintf(stdout, "********** remove unused **********\n");
 	fprintf(stderr, "********** remove unused **********\n");

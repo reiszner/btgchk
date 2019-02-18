@@ -16,8 +16,9 @@ int get_terrain_path (char fullpath[], const char basepath[], const int index) {
 
 	char latc, lonc;
 	coord_geo geo = index2geo(index);
-	geo.lon = geo.lon * 180.0 / M_PI;
-	geo.lat = geo.lat * 180.0 / M_PI;
+	geo.lon = geo.lon * 180.0 / M_PI + .001;
+	geo.lat = geo.lat * 180.0 / M_PI + .001;
+	printf("lon: %Lf / lat: %Lf\n", geo.lon, geo.lat);
 	if (geo.lat < 0.0) latc = 's'; else latc = 'n';
 	if (geo.lon < 0.0) lonc = 'w'; else lonc = 'e';
 		sprintf(fullpath, "%s/Terrain/%c%03d%c%02d/%c%03d%c%02d/", basepath,
@@ -45,7 +46,7 @@ void get_airport_path (char fullpath[], const char basepath[], char airport[]) {
 	sprintf(fullpath, "%s/Airports/%s%s.threshold.xml", basepath, ap, airport);
 }
 
-runway_info *get_airport_info (const char fullpath[]) {
+runway_info *get_airport_info (const char fullpath[], const char als[]) {
 
 	int thr = -1, level = 0, i;
 	char order;
@@ -82,7 +83,6 @@ runway_info *get_airport_info (const char fullpath[]) {
 				else new->threshold[thr].rwy_ord = 0;
 			}
 		}
-//		printf("\n");
 
 		if (node->tree) {
 			if ((temp = malloc(sizeof(*temp))) == NULL) {
@@ -106,6 +106,9 @@ runway_info *get_airport_info (const char fullpath[]) {
 				new->threshold[0].stopw = 0.0;
 				new->threshold[0].rwy_num = 0;
 				new->threshold[0].rwy_ord = 0;
+				new->threshold[0].als_layout = ALS_NOOP;
+				new->threshold[0].als_len = 0;
+				new->threshold[0].origin = NULL;
 				new->threshold[1].lon = 0.0;
 				new->threshold[1].lat = 0.0;
 				new->threshold[1].heading = 0.0;
@@ -113,6 +116,9 @@ runway_info *get_airport_info (const char fullpath[]) {
 				new->threshold[1].stopw = 0.0;
 				new->threshold[1].rwy_num = 0;
 				new->threshold[1].rwy_ord = 0;
+				new->threshold[1].als_layout = ALS_NOOP;
+				new->threshold[1].als_len = 0;
+				new->threshold[1].origin = NULL;
 				new->next = NULL;
 
 				if (last) {
@@ -140,6 +146,13 @@ runway_info *get_airport_info (const char fullpath[]) {
 			}
 		}
 
+	}
+
+	last = runway;
+	while (last) {
+		set_als(&last->threshold[0], als);
+		set_als(&last->threshold[1], als);
+		last = last->next;
 	}
 
 	return runway;
@@ -239,16 +252,141 @@ xml_node *get_key_value (FILE *xml) {
 		}
 		if (!key_flag && line[i] == '<') key_flag = 1;
 	}
-/*
-	if (key_pos == 0 && value_pos == 0) {
-		free(node);
-		node = NULL;
-	}
-*/
-		node->key[key_pos] = '\0';
-		node->value[value_pos] = '\0';
-
+	node->key[key_pos] = '\0';
+	node->value[value_pos] = '\0';
 	return node;
+}
+
+void set_als (threshold_info *threshold, const char *als) {
+
+	int pos, last = 0, rwy, order, als_num, als_len;
+	char rwy_info[64], als_info[64], *token, ord;
+
+	for (pos = 0 ; als[pos] ; pos++) {
+		if (als[pos] == '/') {
+			strncpy(rwy_info, &als[last], pos - last);
+			rwy_info[pos - last] = '\0';
+
+			token = strpbrk(rwy_info, "=");
+			if (token) {
+				*token = '\0';
+				token++;
+				if (token[0]) {
+					strncpy(als_info, token, 64);
+					token = strpbrk(als_info, "@");
+					if (token) {
+						*token = '\0';
+						token++;
+						if (token[0]) {
+							als_len = atoi(token);
+						}
+						else {
+							als_len = 0;
+						}
+					}
+					else {
+						als_len = 0;
+					}
+				}
+				else {
+					als_num = 0;
+					als_len = 0;
+				}
+			}
+			else {
+				als_info[0] = '\0';
+				als_num = 0;
+				als_len = 0;
+			}
+
+			if (strlen(als_info)) {
+				token = als_info;
+				while (token[0]) {
+					token[0] = tolower(token[0]);
+					token++;
+				}
+				if (
+				    strncmp(als_info, "alsf1", 5) == 0 ||
+				    strncmp(als_info, "alsfi", 5) == 0 ||
+				    strncmp(als_info, "alsf-1", 6) == 0 ||
+				    strncmp(als_info, "alsf-i", 6) == 0
+				    ) {
+					als_num = ALS_ALSF1;
+					if (!als_len) als_len = 900;
+					if (als_len < 420) als_len = 420;
+					if (als_len > 900) als_len = 900;
+				}
+				else if (
+				    strncmp(als_info, "alsf2", 5) == 0 ||
+				    strncmp(als_info, "alsfii", 6) == 0 ||
+				    strncmp(als_info, "alsf-2", 5) == 0 ||
+				    strncmp(als_info, "alsf-ii", 7) == 0
+				    ) {
+					als_num = ALS_ALSF2;
+					if (!als_len) als_len = 900;
+					if (als_len < 420) als_len = 420;
+					if (als_len > 900) als_len = 900;
+				}
+				else if (strncmp(als_info, "ssalr", 5) == 0) {
+					als_num = ALS_SSALR;
+					if (!als_len) als_len = 720;
+					if (als_len < 600) als_len = 600;
+					if (als_len > 900) als_len = 900;
+				}
+				else if (strncmp(als_info, "ssalf", 5) == 0) {
+					als_num = ALS_SSALF;
+					if (!als_len) als_len = 420;
+					if (als_len < 420) als_len = 420;
+					if (als_len > 900) als_len = 900;
+				}
+				else if (strncmp(als_info, "ssals", 5) == 0 ||
+				    strncmp(als_info, "sals", 4) == 0
+				    ) {
+					als_num = ALS_SSALS;
+					if (!als_len) als_len = 420;
+					if (als_len < 420) als_len = 420;
+					if (als_len > 900) als_len = 900;
+				}
+				else if (strncmp(als_info, "malsr", 5) == 0) {
+					als_num = ALS_MALSR;
+					if (!als_len) als_len = 720;
+					if (als_len < 600) als_len = 600;
+					if (als_len > 900) als_len = 900;
+				}
+				else if (strncmp(als_info, "malsf", 5) == 0) {
+					als_num = ALS_MALSF;
+					if (!als_len) als_len = 420;
+					if (als_len < 420) als_len = 420;
+					if (als_len > 900) als_len = 900;
+				}
+				else if (strncmp(als_info, "mals", 4) == 0) {
+					als_num = ALS_MALS;
+					if (!als_len) als_len = 420;
+					if (als_len < 420) als_len = 420;
+					if (als_len > 900) als_len = 900;
+				}
+				else {
+					fprintf(stderr, "can't read Approach Light System! ignore it.\n");
+					als_num = ALS_NOOP;
+					als_len = 0;
+				}
+			}
+
+			rwy = atoi(rwy_info);
+			ord = rwy_info[strlen(rwy_info) - 1];
+			if      (ord == 'L' || ord == 'l') order = 1;
+			else if (ord == 'C' || ord == 'c') order = 2;
+			else if (ord == 'R' || ord == 'r') order = 3;
+			else order = 0;
+
+			if (threshold->rwy_num == rwy && threshold->rwy_ord == order) {
+				threshold->als_layout = als_num;
+				threshold->als_len = als_len;
+			}
+
+			last = pos + 1;
+		}
+	}
 }
 
 int btg_decompress (const char filename[]) {

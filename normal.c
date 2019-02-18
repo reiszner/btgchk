@@ -3,42 +3,62 @@
 #include "normal.h"
 #include "raw.h"
 
-btg_normal *read_normal (FILE *f, btg_base *base, unsigned int ver, int index) {
+int read_normal (FILE *f, btg_base *base, unsigned int ver, btg_element *elem) {
 
-	btg_normal *new = NULL;
+	int index;
+	btg_normal *new = NULL, *last = NULL;
 
 	if (base == NULL) {
 		fprintf(stderr, "pointer to base is NULL! break.\n");
-		return NULL;
+		return -1;
 	}
 
-	if ((new = malloc(sizeof(*new))) == NULL) {
-		fprintf(stderr, "No memory left for normal! break.\n");
-		return NULL;
+	for (index = 0 ; index < elem->count ; index++) {
+		if ((new = malloc(sizeof(*new))) == NULL) {
+			fprintf(stderr, "No memory left for normal! break.\n");
+			return -1;
+		}
+		new->next = NULL;
+		new->valid = 1;
+		new->index = index;
+		new->count = 0;
+		new->alias = NULL;
+
+		base->normal_array[index] = new;
+
+		if (read_uchar(f, &new->x)) printf("char Ooops\n");
+		if (read_uchar(f, &new->y)) printf("char Ooops\n");
+		if (read_uchar(f, &new->z)) printf("char Ooops\n");
+
+		if (last) last->next = new;
+		else base->normal = elem->element = new;
+		last = new;
 	}
-	new->next = NULL;
-	new->valid = 1;
-	new->index = index;
-	new->count = 0;
-	new->alias = NULL;
 
-	base->normal_array[index] = new;
+	return index;
+}
 
-	if (read_uchar(f, &new->x)) printf("char Ooops\n");
-	if (read_uchar(f, &new->y)) printf("char Ooops\n");
-	if (read_uchar(f, &new->z)) printf("char Ooops\n");
+unsigned int count_normal (btg_normal *normal) {
 
-	return new;
+	int count = 0;
+
+	while (normal) {
+		if (normal->valid) count++;
+		normal = normal->next;
+	}
+
+	return count;
 }
 
 int write_normal (FILE *f, btg_normal *normal, unsigned int ver) {
-
-	if (normal->valid) {
-		if (write_uchar(f, &normal->x)) return 1;
-		if (write_uchar(f, &normal->y)) return 2;
-		if (write_uchar(f, &normal->z)) return 3;
+	while (normal) {
+		if (normal->valid) {
+			if (write_uchar(f, &normal->x)) return 1;
+			if (write_uchar(f, &normal->y)) return 2;
+			if (write_uchar(f, &normal->z)) return 3;
+		}
+		normal = normal->next;
 	}
-
 	return 0;
 }
 

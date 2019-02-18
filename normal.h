@@ -5,7 +5,8 @@
 
 #include "struct.h"
 
-btg_normal *read_normal (FILE *f, btg_base *base, unsigned int ver, int index);
+int read_normal (FILE *f, btg_base *base, unsigned int ver, btg_element *elem);
+unsigned int count_normal (btg_normal *normal);
 int write_normal (FILE *f, btg_normal *normal, unsigned int ver);
 void free_normal (btg_normal *normal);
 
