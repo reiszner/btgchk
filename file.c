@@ -312,7 +312,7 @@ void set_als (threshold_info *threshold, const char *als) {
 				    strncmp(als_info, "alsf-i", 6) == 0
 				    ) {
 					als_num = ALS_ALSF1;
-					if (!als_len) als_len = 900;
+					if (!als_len) als_len = 720;
 					if (als_len < 420) als_len = 420;
 					if (als_len > 900) als_len = 900;
 				}
@@ -323,7 +323,7 @@ void set_als (threshold_info *threshold, const char *als) {
 				    strncmp(als_info, "alsf-ii", 7) == 0
 				    ) {
 					als_num = ALS_ALSF2;
-					if (!als_len) als_len = 900;
+					if (!als_len) als_len = 720;
 					if (als_len < 420) als_len = 420;
 					if (als_len > 900) als_len = 900;
 				}

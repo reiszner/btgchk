@@ -110,7 +110,7 @@ void check (btg_header *head) {
 		fprintf(stdout, "********** update runway info **********\n");
 		fprintf(stderr, "********** update runway info **********\n");
 		set_runway_info (&head->base, head->runway);
-		remove_old_als (&head->base, head->object, head->runway);
+		change_als (&head->base, head->object, head->runway);
 	}
 
 	fprintf(stdout, "********** remove unused **********\n");
