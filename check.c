@@ -58,8 +58,11 @@ int usage (btg_header *header) {
 void check (btg_header *head) {
 
 //	btg_fence *outside = NULL, *airport = NULL;
-	btg_fence *border = NULL, *found = NULL;
+	btg_fence *fence = NULL, *found = NULL;
 	btg_border *now;
+	btg_edge *all;
+	btg_triangle *tria;
+	int cnt, del, i, j, k;
 
 	fprintf(stdout, "********** check base **********\n");
 	fprintf(stderr, "********** check base **********\n");
@@ -77,14 +80,60 @@ void check (btg_header *head) {
 	fprintf(stderr, "********** check edges **********\n");
 	check_edges (&head->base, head->base.edge);
 
+// check neighbour of ocean
+	all = head->base.edge;
+	while (all) {
+		cnt = 0;
+		for (i = 0 ; i < 10 ; i++) {
+			if (all->tria[i]) cnt++;
+		}
+		if (cnt != all->count) {
+			printf ("edge-count: %d / count: %d\n", all->count, cnt);
+		}
+
+		if (all->mark == 0 && all->count == 1) {
+			del = 1;
+			tria = all->tria[0];
+			if (strncmp(tria->object->prop_material, "Ocean", 5) == 0) {
+				printf("--> found Ocean!!!\n");
+				for (j = 0 ; j < 3 ; j++) {
+					if (tria->edge[j]->count > 1) {
+						for (k = 0 ; k < 10 ; k++) {
+							if (tria->edge[j]->tria[k] && tria->edge[j]->tria[k] != tria) {
+								if (strncmp(tria->edge[j]->tria[k]->object->prop_material, "Ocean", 5) == 0) del = 0;
+								printf ("has neighbour '%s' /del: %d\n", tria->edge[j]->tria[k]->object->prop_material, del);
+							}
+						}
+					}
+				}
+				if (del) {
+					unrec_triangle (&head->base, tria);
+					printf("delete !!!\n");
+				}
+			}
+		}
+
+		all = all->next;
+	}
+
 	fprintf(stdout, "********** collect border **********\n");
 	fprintf(stderr, "********** collect border **********\n");
-	border = collect_border (&head->base.edge);
+	fence = collect_border (&head->base.edge);
+
+
+
+/* Debug
+	fprintf(stdout, "********** remove unused **********\n");
+	fprintf(stderr, "********** remove unused **********\n");
+	remove_unused (head);
+	return;
+*/
+
 
 	fprintf(stdout, "********** search fence **********\n");
 	fprintf(stderr, "********** search fence **********\n");
-	while (border->border) {
-		if ((found = find_fence (border))) {
+	while (fence->border) {
+		if ((found = find_fence (fence))) {
 			if ((found = examine_fence (found, &head->base))) {
 				if (head->base.fence_last) {
 					head->base.fence_last->next = found;
@@ -102,17 +151,17 @@ void check (btg_header *head) {
 		}
 	}
 
-	free_border (border->border);
-	free (border);
-	border = NULL;
-
+	free_border (fence->border);
+	free (fence);
+	fence = NULL;
+/*
 	if (head->runway) {
 		fprintf(stdout, "********** update runway info **********\n");
 		fprintf(stderr, "********** update runway info **********\n");
 		set_runway_info (&head->base, head->runway);
 		change_als (&head->base, head->object, head->runway);
 	}
-
+*/
 	fprintf(stdout, "********** remove unused **********\n");
 	fprintf(stderr, "********** remove unused **********\n");
 	remove_unused (head);

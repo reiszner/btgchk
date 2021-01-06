@@ -8,32 +8,27 @@
 #include "triangle.h"
 #include "object.h"
 
-int read_btg (FILE *f, btg_header **header) {
+int read_btg (FILE *f, btg_header *header) {
 
 	int i;
 	btg_header *h;
 	btg_object *obj = NULL, *last = NULL;
 
 	if (header == NULL) {
-		fprintf(stderr, "double pointer to header is NULL! exit.\n");
+		fprintf(stderr, "read_btg: pointer to header is NULL! exit.\n");
 		return 1;
 	}
 
-	if (*header != NULL) {
-		fprintf(stderr, "pointer to header isn't NULL! exit.\n");
+	if (read_header(f, header)) {
+		fprintf(stderr, "read_btg: Problem while reading Header! exit.\n");
 		return 2;
 	}
-
-	if (read_header(f, header)) {
-		fprintf(stderr, "Problem while reading Header! exit.\n");
-		return 3;
-	}
-	h = *header;
+	h = header;
 
 	for (i = 0 ; i < h->num_object ; i++) {
-		printf("read object %d ...\n", i);
+		printf("read_btg: read object %d ...\n", i);
 		if ((obj = read_object (f, &h->base, h->version)) == NULL) {
-			fprintf(stderr, "problem while reading objects!\n");
+			fprintf(stderr, "read_btg: problem while reading objects!\n");
 			return 4;
 		}
 		if (last) {
@@ -44,7 +39,7 @@ int read_btg (FILE *f, btg_header **header) {
 			h->object = last = obj;
 		}
 	}
-	printf("file end on position: %ld\n", ftell(f));
+	printf("read_btg: file end on position: %ld\n", ftell(f));
 
 	if (h->base.vertex_array) {
 		free (h->base.vertex_array);

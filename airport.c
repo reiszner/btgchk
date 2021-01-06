@@ -223,10 +223,10 @@ void set_runway_info (btg_base *base, runway_info *runway) {
 	double len, len_now;
 	long double msl = 0.0;
 	btg_triangle *tria = NULL;
-	btg_edge *all = NULL, *last = NULL;
 	btg_fence *border = NULL, *fence = NULL, *prev = NULL, *now;
 	btg_vertex *origin = NULL, *origin_last = NULL, *new, tmp;
 	runway_info *rwy = NULL;
+	btg_base temp_base;
 	coord_geo  g_coord;
 	coord_cart c_coord;
 
@@ -240,6 +240,10 @@ void set_runway_info (btg_base *base, runway_info *runway) {
 		return;
 	}
 
+	temp_base.edge = NULL;
+	temp_base.edge_last = NULL;
+
+
 // build a edge list only from thresholds
 	tria = base->triangle;
 	while (tria) {
@@ -249,16 +253,16 @@ void set_runway_info (btg_base *base, runway_info *runway) {
 	    )
 		{
 			for (cnt = 0 ; cnt < 3 ; cnt++) {
-				rec_edge(&all, &last, tria->edge[cnt]->vertex[0], tria->edge[cnt]->vertex[1], tria);
+				rec_edge(&temp_base, tria->edge[cnt]->vertex[0], tria->edge[cnt]->vertex[1], tria);
 			}
 		}
 		tria = tria->next;
 	}
-	if (!all) return;
+	if (!temp_base.edge) return;
 
 // collect all border edges
-	border = collect_border (&all);
-	free_edges (all);
+	border = collect_border (&temp_base.edge);
+	free_edges (temp_base.edge);
 
 // sort fences (every runway should have 2 thresholds)
 	while (border && border->border && (now = find_fence (border))) {

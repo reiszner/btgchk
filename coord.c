@@ -6,6 +6,22 @@
 
 #include "coord.h"
 
+
+coord_geo vertex2geo (const btg_vertex *vertex) {
+
+	coord_geo geo;
+	coord_cart cart;
+
+	cart.x = vertex->absolute.x;
+	cart.y = vertex->absolute.y;
+	cart.z = vertex->absolute.z;
+
+	geo = cart2geo(cart);
+
+	return geo;
+
+}
+
 coord_geo cart2geo (coord_cart cart) {
 
 	coord_geo geo;

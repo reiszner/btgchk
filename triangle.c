@@ -80,7 +80,7 @@ int rec_triangle (btg_base *base, btg_triangle *triangle) {
 		}
 		if (strncmp("lf_", triangle->object->prop_material, 3)) {
 			for (cnt = 0 ; cnt < 3 ; cnt++) {
-				triangle->edge[cnt] = rec_edge (&base->edge, &base->edge_last, corner[cnt], corner[(cnt + 1) % 3], triangle);
+				triangle->edge[cnt] = rec_edge (base, corner[cnt], corner[(cnt + 1) % 3], triangle);
 			}
 		}
 		triangle->elem->valid = 1;
@@ -96,14 +96,17 @@ int rec_triangle (btg_base *base, btg_triangle *triangle) {
 void unrec_triangle (btg_base *base, btg_triangle *triangle) {
 	int i;
 	btg_geometry *geo = triangle->elem->element;
-	for (i = 0 ; i < 3 ; i++) {
-		unrec_edge (triangle->edge[i], triangle);
+
+	if (triangle->elem->valid) {
+		for (i = 0 ; i < 3 ; i++) {
+			unrec_edge (triangle->edge[i], triangle);
+		}
+		while (geo) {
+			unrec_geometry (geo);
+			geo = geo->next;
+		}
+		triangle->elem->valid = 0;
 	}
-	while (geo) {
-		unrec_geometry (geo);
-		geo = geo->next;
-	}
-	triangle->elem->valid = 0;
 }
 
 void check_triangle (btg_base *base, btg_triangle *triangle_start) {
@@ -163,7 +166,12 @@ void check_triangle (btg_base *base, btg_triangle *triangle_start) {
 						geo = geo->next;
 					}
 					if (cnt == 3) {
-						unrec_triangle (base, triangle_temp);
+						if (strncmp(triangle->object->prop_material, "Ocean", 5) == 0) {
+							unrec_triangle (base, triangle);
+						}
+						else {
+							unrec_triangle (base, triangle_temp);
+						}
 						error++;
 					}
 				}

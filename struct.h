@@ -195,6 +195,10 @@ typedef struct btg_base_s {
 	double max_x;
 	double min_y;
 	double max_y;
+	double min_lon;
+	double max_lon;
+	double min_lat;
+	double max_lat;
 	double holesize;
 	char *material;
 	btg_bsphere  *bsphere;
@@ -217,6 +221,8 @@ typedef struct btg_base_s {
 } btg_base;
 
 typedef struct btg_header_s {
+	int index;
+	char airport[8];
 	time_t creation;
 	unsigned short version;
 	unsigned short mag_num;
@@ -224,6 +230,7 @@ typedef struct btg_header_s {
 	runway_info *runway;
 	btg_object *object;
 	btg_base base;
+	struct btg_header_s *next;
 } btg_header;
 
 typedef struct btg_border_s {

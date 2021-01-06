@@ -41,6 +41,8 @@ int read_vertex (FILE *f, btg_base *base, unsigned int ver, btg_element *elem) {
 		new->absolute.y = base->bsphere->coord.y + new->relative.y;
 		new->absolute.z = base->bsphere->coord.z + new->relative.z;
 
+		
+
 		if (last) last->next = new;
 		else base->vertex = elem->element = new;
 		last = new;
@@ -73,6 +75,8 @@ int write_vertex (FILE *f, btg_vertex *vertex, unsigned int ver) {
 	return 0;
 }
 
+
+
 void free_vertex (btg_vertex *vertex) {
 	btg_vertex *temp = NULL;
 	while (vertex) {
@@ -99,12 +103,12 @@ void remove_unused_vertices (btg_vertex *vertex) {
 		vertex = vertex->next;
 	}
 
-	if (error) printf("%zd unused vertices deleted.\n", error);
+	printf("vertices: %zd valid / %zd unused deleted.\n", cnt, error);
 }
 
 void check_same_vertices (btg_vertex *vertex) {
 
-	int error = 0, cnt = 0;
+	int error = 0;
 	btg_vertex *temp;
 
 	if (vertex == NULL) {
@@ -113,26 +117,19 @@ void check_same_vertices (btg_vertex *vertex) {
 	}
 
 	while (vertex) {
-		cnt++;
 		if (vertex->valid) {
 			temp = vertex->next;
-			while (temp && vertex->valid) {
+			while (temp) {
 				if (
 			    temp->valid &&
 			    fabsf(vertex->relative.x - temp->relative.x) < VERTEX_PRECITION &&
 			    fabsf(vertex->relative.y - temp->relative.y) < VERTEX_PRECITION &&
 			    fabsf(vertex->relative.z - temp->relative.z) < VERTEX_PRECITION
 			    ) {
-					if (vertex->count > temp->count) {
-						temp->alias = vertex;
-						vertex->count += temp->count;
-						temp->valid = 0;
-					}
-					else {
-						vertex->alias = temp;
-						temp->count += vertex->count;
-						vertex->valid = 0;
-					}
+					temp->alias = vertex;
+					vertex->count += temp->count;
+					temp->count = 0;
+					temp->valid = 0;
 					error++;
 				}
 				temp = temp->next;
@@ -334,12 +331,13 @@ double vecphi (const vector vec0, const vector vec1) {
 	return angle;
 }
 
+
+
 btg_vertex *intersection (const btg_vertex *v0, const btg_vertex *v1, const btg_vertex *v2, const btg_vertex *v3) {
 
 	btg_vertex *inter = NULL;
 	vector vec0, vec1;
 	double len0, len1, leninter, lenfull, lenbase, factor;
-
 
 	if ((inter = malloc(sizeof(*inter))) == NULL) {
 		fprintf(stderr, "no memory left for intersection! break.\n");
@@ -394,73 +392,3 @@ vector area_normal (const btg_vertex *v0, const btg_vertex *v1, const btg_vertex
 
 	return vecr;
 }
-
-/*
-	double len_long, len_short, intersection_x, factor;
-	btg_vertex v3;
-	const btg_vertex *temp_v;
-	vector tria_vec[3], temp_vec;
-	normal n0, n1, n2;
-
-	tria_vec[0].vertex[0] = v0;
-	tria_vec[0].vertex[1] = v1;
-	tria_vec[0].len = pydacoras(v0, v1);
-
-	tria_vec[1].vertex[0] = v1;
-	tria_vec[1].vertex[1] = v2;
-	tria_vec[1].len = pydacoras(v1, v2);
-
-	tria_vec[2].vertex[0] = v2;
-	tria_vec[2].vertex[1] = v0;
-	tria_vec[2].len = pydacoras(v2, v0);
-
-// sort vectors by length
-	if ((tria_vec[1].len > tria_vec[0].len) && (tria_vec[1].len > tria_vec[2].len)) {
-		temp_vec = tria_vec[0];
-		tria_vec[0] = tria_vec[1];
-		tria_vec[1] = temp_vec;
-	}
-	if ((tria_vec[2].len > tria_vec[0].len) && (tria_vec[2].len > tria_vec[1].len)) {
-		temp_vec = tria_vec[0];
-		tria_vec[0] = tria_vec[2];
-		tria_vec[2] = temp_vec;
-	}
-	if (tria_vec[2].len > tria_vec[1].len) {
-		temp_vec = tria_vec[1];
-		tria_vec[1] = tria_vec[2];
-		tria_vec[2] = temp_vec;
-	}
-
-// correct order of vertex
-	if (tria_vec[0].vertex[0] == tria_vec[1].vertex[0] || tria_vec[0].vertex[0] == tria_vec[1].vertex[1]) {
-		temp_v = tria_vec[0].vertex[0];
-		tria_vec[0].vertex[0] = tria_vec[0].vertex[1];
-		tria_vec[0].vertex[1] = temp_v;
-	}
-	if (tria_vec[1].vertex[0] == tria_vec[2].vertex[0] || tria_vec[1].vertex[0] == tria_vec[2].vertex[1]) {
-		temp_v = tria_vec[1].vertex[0];
-		tria_vec[1].vertex[0] = tria_vec[1].vertex[1];
-		tria_vec[1].vertex[1] = temp_v;
-	}
-
-	// intersection of two circles with different radius
-	len_long  = (tria_vec[1].len / tria_vec[0].len) * tria_vec[1].len;
-	len_short = (tria_vec[2].len / tria_vec[0].len) * tria_vec[2].len;
-	intersection_x = ((tria_vec[0].len - (len_long + len_short)) / 2.0) + len_long;
-//	intersection_y = sqrt((tria_vec[1].len * tria_vec[1].len) - (intersection_x * intersection_x));
-	factor = intersection_x / tria_vec[0].len;
-
-	v3.x = ((tria_vec[0].vertex[0]->x - tria_vec[0].vertex[1]->x) * factor) + tria_vec[0].vertex[1]->x;
-	v3.y = ((tria_vec[0].vertex[0]->y - tria_vec[0].vertex[1]->y) * factor) + tria_vec[0].vertex[1]->y;
-	v3.z = ((tria_vec[0].vertex[0]->z - tria_vec[0].vertex[1]->z) * factor) + tria_vec[0].vertex[1]->z;
-
-	n0 = vector2normal (tria_vec[0].vertex[0], tria_vec[0].vertex[1]);
-	n1 = vector2normal (&v3, tria_vec[1].vertex[1]);
-//	n2 = area_normal(n0, n1);
-	n2.x = (n0.y * n1.z) - (n0.z * n1.y);
-	n2.y = (n0.z * n1.x) - (n0.x * n1.z);
-	n2.z = (n0.x * n1.y) - (n0.y * n1.x);
-
-	return n2;
-}
-*/

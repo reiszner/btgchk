@@ -24,7 +24,7 @@
 
 #include "raw.h"
 #include "btgio.h"
-
+#include "object.h"
 
 
 int main(int argc, char *argv[])
@@ -55,9 +55,14 @@ int main(int argc, char *argv[])
 		return 2;
 	}
 
-	if (read_btg (file, &header)) {
-		fprintf(stderr, "Problem while reading btg file! exit.\n");
+	if ((header = new_header (&header)) == NULL) {
+		fprintf(stderr, "no memory left for header!\n");
 		return 3;
+	}
+
+	if (read_btg (file, header)) {
+		fprintf(stderr, "Problem while reading btg file! exit.\n");
+		return 4;
 	}
 	fclose (file);
 
@@ -117,7 +122,8 @@ int main(int argc, char *argv[])
 	}
 
 	fclose (file);
-	free(header->object);
+//	free_object(header->object);
+	free_header(header);
 
 	return (0);
 }

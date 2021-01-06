@@ -303,7 +303,17 @@ void free_element(btg_element *elem, unsigned char type) {
 					free_texcoo(elem->element);
 					break;
 
+				case OBJ_POINTS:
+					free_point(elem->element);
+					break;
+
+				case OBJ_TRIS:
+					free_triangle(elem->element);
+					break;
+
 // TODO: free points and triangles
+//			printf("edge...\n");
+//			if (head->base.edge)     free_edges (head->base.edge);
 
 			}
 		}

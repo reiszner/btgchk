@@ -3,88 +3,57 @@
 #include "raw.h"
 #include "header.h"
 #include "object.h"
+#include "vertex.h"
+#include "normal.h"
+#include "color.h"
+#include "texcoo.h"
+#include "point.h"
+#include "triangle.h"
+#include "edge.h"
 
-int read_header (FILE *f, btg_header **head) {
+int read_header (FILE *f, btg_header *head) {
 
 	unsigned int cr;
 	unsigned short cnt;
-	btg_header *new = NULL;
 
 	if (head == NULL) {
-		fprintf(stderr, "double pointer to header is NULL! exit.\n");
+		fprintf(stderr, "pointer to header is NULL! exit.\n");
 		return 1;
 	}
 
-	if (*head != NULL) {
-		fprintf(stderr, "pointer to header isn't NULL! exit.\n");
-		return 2;
-	}
-
-	if ((new = malloc(sizeof(*new))) == NULL) {
-		fprintf(stderr, "No memory left for header! exit.\n");
-		return 3;
-	}
-	*head = new;
-
-	new->base.min_x = 0.0;
-	new->base.max_x = 0.0;
-	new->base.min_y = 0.0;
-	new->base.max_y = 0.0;
-	new->base.holesize = 0.0;
-	new->base.material = NULL;
-	new->base.bsphere = NULL;
-	new->base.vertex = NULL;
-	new->base.vertex_array = NULL;
-	new->base.normal = NULL;
-	new->base.normal_array = NULL;
-	new->base.texcoo = NULL;
-	new->base.texcoo_array = NULL;
-	new->base.color = NULL;
-	new->base.color_array = NULL;
-	new->base.point = NULL;
-	new->base.point_last = NULL;
-	new->base.triangle = NULL;
-	new->base.triangle_last = NULL;
-	new->base.edge = NULL;
-	new->base.edge_last = NULL;
-	new->base.fence = NULL;
-	new->base.fence_last = NULL;
-	new->object = NULL;
-	new->runway = NULL;
-
 	printf("read Header ...\n");
 
-	read_ushort(f, &new->version);
-	if (new->version != 7 && new->version != 10) {
-		fprintf(stderr, "unknown version (%d)! exit.\n", new->version);
+	read_ushort(f, &head->version);
+	if (head->version != 7 && head->version != 10) {
+		fprintf(stderr, "unknown version (%d)! exit.\n", head->version);
 		return 4;
 	}
-	printf("Version: %hd\n", new->version);
+	printf("Version: %hd\n", head->version);
 
-	read_ushort(f, &new->mag_num);
-	if (new->mag_num != 0x5347) {
+	read_ushort(f, &head->mag_num);
+	if (head->mag_num != 0x5347) {
 		fprintf(stderr, "Magic Number isn't 'SG'! exit.\n");
 		return 5;
 	}
-	printf("Magic Number: %c%c\n", (new->mag_num >> 8), (new->mag_num & 0x00ff));
+	printf("Magic Number: %c%c\n", (head->mag_num >> 8), (head->mag_num & 0x00ff));
 
 	read_uint(f, &cr);
-	new->creation = cr;
-	printf("Creation Time: %s", ctime(&new->creation));
+	head->creation = cr;
+	printf("Creation Time: %s", ctime(&head->creation));
 
-	if (new->version == 7) {
+	if (head->version == 7) {
 		read_ushort(f, &cnt);
-		new->num_object = cnt;
+		head->num_object = cnt;
 	}
-	else if (new->version == 10) {
-		read_uint(f, &new->num_object);
+	else if (head->version == 10) {
+		read_uint(f, &head->num_object);
 	}
 	else {
-		fprintf(stderr, "Unknown Version %hd! exit.\n", new->version);
+		fprintf(stderr, "Unknown Version %hd! exit.\n", head->version);
 		return 6;
 	}
 
-	if (new->num_object == 0) {
+	if (head->num_object == 0) {
 		fprintf(stderr, "Toplevel Objects is 0! exit.\n");
 		return 7;
 	}
@@ -127,16 +96,80 @@ int write_header (FILE *f, btg_header *head) {
 	return 0;
 }
 
+
+btg_header *new_header (btg_header **all_header) {
+
+	btg_header *header = NULL, *temp = NULL;
+
+	if (all_header == NULL) {
+		fprintf(stderr, "double pointer to all_header is NULL! exit.\n");
+		return header;
+	}
+
+	if ((header = malloc(sizeof (*header))) == NULL) {
+		fprintf(stderr, "no memory left for header!\n");
+		return header;
+	}
+
+	header->index = -1;
+	header->airport[0] = '\0';
+	header->creation = 0;
+	header->version = 0;
+	header->mag_num = 0;
+	header->num_object = 0;
+	header->base.min_x = 0.0;
+	header->base.max_x = 0.0;
+	header->base.min_y = 0.0;
+	header->base.max_y = 0.0;
+	header->base.min_lon = 0.0;
+	header->base.max_lon = 0.0;
+	header->base.min_lat = 0.0;
+	header->base.max_lat = 0.0;
+	header->base.holesize = 0.0;
+	header->base.material = NULL;
+	header->base.bsphere = NULL;
+	header->base.vertex = NULL;
+	header->base.vertex_array = NULL;
+	header->base.normal = NULL;
+	header->base.normal_array = NULL;
+	header->base.texcoo = NULL;
+	header->base.texcoo_array = NULL;
+	header->base.color = NULL;
+	header->base.color_array = NULL;
+	header->base.point = NULL;
+	header->base.point_last = NULL;
+	header->base.triangle = NULL;
+	header->base.triangle_last = NULL;
+	header->base.edge = NULL;
+	header->base.edge_last = NULL;
+	header->base.fence = NULL;
+	header->base.fence_last = NULL;
+	header->object = NULL;
+	header->runway = NULL;
+	header->next = NULL;
+
+	if (*all_header == NULL) {
+		*all_header = header;
+	}
+	else {
+		temp = *all_header;
+		while (temp->next) temp = temp->next;
+		temp->next = header;
+	}
+
+	return header;
+}
+
 void free_header (btg_header *head) {
-	if (head) {
-		if (head->object)        free_object (head->object);
-		if (head->base.vertex)   free (head->base.vertex);
-		if (head->base.normal)   free (head->base.normal);
-		if (head->base.color )   free (head->base.color);
-		if (head->base.texcoo)   free (head->base.texcoo);
-		if (head->base.point)    free (head->base.point);
-		if (head->base.triangle) free (head->base.triangle);
-		if (head->base.edge)     free (head->base.edge);
-		free(head);
+
+	btg_header *temp;
+
+	while (head) {
+		temp = head->next;
+		if (head) {
+			if (head->object) free_object (head->object);
+			free(head);
+		}
+		head = temp;
 	}
 }

@@ -86,7 +86,7 @@ void remove_unused_texcoos (btg_texcoo *texcoo) {
 		texcoo = texcoo->next;
 	}
 
-	if (error) printf("%zd unused texture coordinates deleted.\n", error);
+	printf("texture coordinates %zd valid / %zd unused deleted.\n", cnt, error);
 }
 
 void check_same_texcoos (btg_texcoo *texcoo) {
@@ -97,22 +97,16 @@ void check_same_texcoos (btg_texcoo *texcoo) {
 	while (texcoo) {
 		if (texcoo->valid) {
 			temp = texcoo->next;
-			while (temp && texcoo->valid) {
+			while (temp) {
 				if (
 			    temp->valid &&
 			    fabsf(texcoo->u - temp->u) < TEXCOO_PRECITION &&
 			    fabsf(texcoo->v - temp->v) < TEXCOO_PRECITION
 			    ) {
-					if (texcoo->count > temp->count) {
-						temp->alias = texcoo;
-						texcoo->count += temp->count;
-						temp->valid = 0;
-					}
-					else {
-						texcoo->alias = temp;
-						temp->count += texcoo->count; 
-						texcoo->valid = 0;
-					}
+					temp->alias = texcoo;
+					texcoo->count += temp->count;
+					temp->count = 0;
+					temp->valid = 0;
 					error++;
 				}
 				temp = temp->next;

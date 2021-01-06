@@ -91,7 +91,7 @@ void remove_unused_colors (btg_color *color) {
 		color = color->next;
 	}
 
-	if (error) printf("%zd unused colors deleted.\n", error);
+	printf("colors: %zd valid / %zd unused deleted.\n", cnt, error);
 }
 
 void check_same_colors (btg_color *color) {
@@ -102,7 +102,7 @@ void check_same_colors (btg_color *color) {
 	while (color) {
 		if (color->valid) {
 			temp = color->next;
-			while (temp && color->valid) {
+			while (temp) {
 				if (
 			    temp->valid &&
 			    color->r == temp->r &&
@@ -110,16 +110,10 @@ void check_same_colors (btg_color *color) {
 			    color->b == temp->b &&
 			    color->a == temp->a
 			    ) {
-					if (color->count > temp->count) {
-						temp->alias = color;
-						color->count += temp->count;
-						temp->valid = 0;
-					}
-					else {
-						color->alias = temp;
-						temp->count += color->count;
-						color->valid = 0;
-					}
+					temp->alias = color;
+					color->count += temp->count;
+					temp->count = 0;
+					temp->valid = 0;
 					error++;
 				}
 				temp = temp->next;

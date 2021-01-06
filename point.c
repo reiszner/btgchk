@@ -65,7 +65,7 @@ void unrec_point (btg_point *point) {
 void check_points (btg_point *point_start) {
 
 	size_t error = 0;
-	btg_point *point = point_start, *point_temp;
+	btg_point *point = point_start; //, *point_temp;
 	btg_geometry *geo, *geo_temp;
 
 	while (point) {
@@ -81,8 +81,8 @@ void check_points (btg_point *point_start) {
 
 	point = point_start;
 	while (point) {
-		if (point->geo->valid) {
-			geo = point->geo;
+		geo = point->geo;
+		if (geo->valid) {
 			geo_temp = geo->next;
 			while (geo_temp) {
 				if (
@@ -98,6 +98,7 @@ void check_points (btg_point *point_start) {
 				}
 				geo_temp = geo_temp->next;
 			}
+/*   // kills lights with different materials
 			point_temp = point->next;
 			while (point_temp) {
 				geo_temp = point_temp->geo;
@@ -117,6 +118,7 @@ void check_points (btg_point *point_start) {
 				}
 				point_temp = point_temp->next;
 			}
+*/
 		}
 		point = point->next;
 	}

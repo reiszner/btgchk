@@ -42,15 +42,14 @@ int main(int argc, char *argv[])
 	FILE *infile = NULL, *outfile = NULL;
 	char fullpath[PATH_MAX] = {"\0"}, basepath[PATH_MAX] = {"\0"}, filename[PATH_MAX] = {"\0"}, file[PATH_MAX] = {"\0"};
 	char index_s[PATH_MAX] = {"\0"}, lat_s[PATH_MAX] = {"\0"}, lon_s[PATH_MAX] = {"\0"}, texture[64] = {"\0"}, rwy_als[PATH_MAX] = {"\0"};
-	int opt, flagp = 0, flaga = 0, flagi = 0, flagl = 0, flagm = 0, flagg = 0, index[5] = {0}, cnt;
+	int opt, flagp = 0, flaga = 0, flagi = 0, flagl = 0, flagm = 0, flagn = 0, flagg = 0, index = 0, indices[10] = {0}, cnt;
 	double holesize = -2.0;
-	btg_header *airport = NULL, *tile[5] = {NULL};
+	btg_header *all_header = NULL, *last_header = NULL, *temp = NULL;
 	coord_cart cart;
 	coord_geo geo;
 	btg_vertex *v;
 
-
-	while ((opt = getopt(argc, argv, "p:a:i:l:m:h:t:s:r:")) != -1) {
+	while ((opt = getopt(argc, argv, "p:a:i:l:m:t:s:r:nh")) != -1) {
 		switch (opt) {
 			case 'p':
 				strncpy(basepath, optarg, PATH_MAX);
@@ -62,7 +61,7 @@ int main(int argc, char *argv[])
 				break;
 			case 'i':
 				strncpy(index_s, optarg, PATH_MAX);
-				index[0] = atoi(index_s);
+				index = atoi(index_s);
 				flagi = 1;
 				break;
 			case 'l': /* latitude */
@@ -72,6 +71,9 @@ int main(int argc, char *argv[])
 			case 'm': /* meridian/longitude */
 				strncpy(lon_s, optarg, PATH_MAX);
 				flagm = 1;
+				break;
+			case 'n':
+				flagn = 1;
 				break;
 			case 's':
 				sscanf(optarg, "%lf", &holesize);
@@ -89,6 +91,7 @@ int main(int argc, char *argv[])
 				fprintf(stderr, "       %s -p basepath -i tileindex\n", argv[0]);
 				fprintf(stderr, "       %s -p basepath -l latitude -m longitude\n", argv[0]);
 				fprintf(stderr, "additional parameters:\n");
+				fprintf(stderr, "    -n                  check boundery to neighbour tiles\n");
 				fprintf(stderr, "    -s meter            the maximum size (in meter) of holes to close\n");
 				fprintf(stderr, "    -t texture          a texture for closing holes\n");
 				fprintf(stderr, "    -r rwy[=als[@len]]  new approach light system for runway <rwy>\n");
@@ -174,14 +177,14 @@ int main(int argc, char *argv[])
 			printf("\n");
 			if (tmp->threshold[0].als_layout != ALS_NOOP) {
 				printf("        ALS change  : %s @ %d\n",
-			    tmp->threshold[0].als_layout == ALS_ALSF1 ? "ALSF-I" :
+				    tmp->threshold[0].als_layout == ALS_ALSF1 ? "ALSF-I" :
 				    tmp->threshold[0].als_layout == ALS_ALSF2 ? "ALSF-II" :
 				    tmp->threshold[0].als_layout == ALS_SSALR ? "SSALR" :
 				    tmp->threshold[0].als_layout == ALS_SSALF ? "SSALF" :
 				    tmp->threshold[0].als_layout == ALS_MALSF ? "MALSF" :
 				    tmp->threshold[0].als_layout == ALS_MALS ? "MALS" :
 				    "delete",
-			    tmp->threshold[0].als_len);
+				    tmp->threshold[0].als_len);
 			}
 
 			printf("    Threshold 2:\n");
@@ -199,14 +202,14 @@ int main(int argc, char *argv[])
 			printf("\n");
 			if (tmp->threshold[1].als_layout != ALS_NOOP) {
 				printf("        ALS change  : %s @ %d\n",
-			    tmp->threshold[1].als_layout == ALS_ALSF1 ? "ALSF-I" :
+				    tmp->threshold[1].als_layout == ALS_ALSF1 ? "ALSF-I" :
 				    tmp->threshold[1].als_layout == ALS_ALSF2 ? "ALSF-II" :
 				    tmp->threshold[1].als_layout == ALS_SSALR ? "SSALR" :
 				    tmp->threshold[1].als_layout == ALS_SSALF ? "SSALF" :
 				    tmp->threshold[1].als_layout == ALS_MALSF ? "MALSF" :
 				    tmp->threshold[1].als_layout == ALS_MALS ? "MALS" :
 				    "delete",
-			    tmp->threshold[1].als_len);
+				    tmp->threshold[1].als_len);
 			}
 
 			tmp = tmp->next;
@@ -215,8 +218,8 @@ int main(int argc, char *argv[])
 // calculate the index for full path
 		geo.lon = ((geo.lon / cnt) * M_PI) / 180.0;
 		geo.lat = ((geo.lat / cnt) * M_PI) / 180.0;
-		index[0] = geo2index(geo);
-		get_terrain_path (fullpath, basepath, index[0]);
+		index = geo2index(geo);
+		get_terrain_path (fullpath, basepath, index);
 
 		snprintf(file, PATH_MAX, "%.4082s/%.8s", fullpath, filename);
 		btg_decompress (file);
@@ -227,36 +230,39 @@ int main(int argc, char *argv[])
 			return EXIT_FAILURE;
 		}
 
-		if (read_btg (infile, &airport)) {
+		if ((last_header = new_header (&all_header)) == NULL) {
+			fprintf(stderr, "no memory left for header!\n");
+			return EXIT_FAILURE;
+		}
+
+		if (read_btg (infile, last_header)) {
 			fprintf(stderr, "Problem while reading btg-file '%s'! exit.\n", file);
 			fclose (infile);
 			return EXIT_FAILURE;
 		}
 		fclose (infile);
+		strncpy(last_header->airport, filename, 8);
 
-		if (!airport) {
-			fprintf(stderr, "airport points to nowhere! exit.\n");
-			return EXIT_FAILURE;
-		}
 		if (holesize > -1.0)
-			airport->base.holesize = holesize;
+			last_header->base.holesize = holesize;
 		else
-			airport->base.holesize = 350.0;
+			last_header->base.holesize = 350.0;
 		if (strlen(texture))
-			airport->base.material = texture;
+			last_header->base.material = texture;
 		else
-			airport->base.material = NULL;
-		airport->runway = runway;
+			last_header->base.material = NULL;
+		last_header->runway = runway;
 
 // correct index from bounding sphere
-		bs = airport->base.bsphere;
+		bs = last_header->base.bsphere;
 		printf("*****\nBounding Sphere is on\nx: %f y: %f z: %f\n", bs->coord.x, bs->coord.y, bs->coord.z);
 		cart.x = bs->coord.x;
 		cart.y = bs->coord.y;
 		cart.z = bs->coord.z;
 		geo = cart2geo (cart);
-		printf("Lon: %Lf Lat: %Lf ASL: %Lf\n*****\n", (geo.lon * 180.0) / M_PI, (geo.lat * 180.0) / M_PI, geo.msl);
-		index[0] = geo2index(geo);
+		printf("Lon: %Lf Lat: %Lf MSL: %Lf\n*****\n", (geo.lon * 180.0) / M_PI, (geo.lat * 180.0) / M_PI, geo.msl);
+		index = 0;
+//		printf("a-flag - index: %d...\n", index);
 	}
 
 	if (flagi) {
@@ -264,141 +270,142 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "invalid index '%s'! exit.\n", index_s);
 			return EXIT_FAILURE;
 		}
+		printf("i-flag - index: %d...\n", index);
 	}
-
-
 
 	if (flagg) {
 		coord_geo geo;
 		geo.lon = (atof(lon_s) * M_PI) / 180.0;
 		geo.lat = (atof(lat_s) * M_PI) / 180.0;
 		geo.msl = 0.0;
-		index[0] = geo2index(geo);
+		index = geo2index(geo);
+//		printf("g-flag - index: %d...\n", index);
 	}
+	indices[0] = index;
 
-// find neighbours
-	if (airport) {
-		find_maxima(index, airport);
-	}
-	else {
-		find_neighbours(index);
+	// find neighbours
+	if (flagn) {
+		if (last_header && last_header->index < 0 && strlen(last_header->airport) > 0) {
+			find_maxima(indices, last_header);
+		}
+		else {
+			find_neighbours(indices);
+		}
 	}
 
 	printf("read in affected tiles ...\n");
-	for (cnt = 0 ; cnt < 5 ; cnt++) {
-		if (index[cnt] != 0) {
-			printf("read tile %d\n", index[cnt]);
+	for (cnt = 0 ; cnt < 10 ; cnt++) {
+		if (indices[cnt] != 0) {
+			printf("read tile %d\n", indices[cnt]);
 
 // we have now a index, read the tile in
-			get_terrain_path (fullpath, basepath, index[cnt]);
-			snprintf(file, PATH_MAX, "%.4084s/%d", fullpath, index[cnt]);
+			get_terrain_path (fullpath, basepath, indices[cnt]);
+			snprintf(file, PATH_MAX, "%.4084s/%d", fullpath, indices[cnt]);
 			btg_decompress (file);
 
-			snprintf(file, PATH_MAX, "%.4084s/%d.btg", fullpath, index[cnt]);
+			snprintf(file, PATH_MAX, "%.4084s/%d.btg", fullpath, indices[cnt]);
 			if ((infile = fopen(file, "rb")) == NULL) {
 				fprintf(stderr, "File '%s' doesn't exist! exit.\n", file);
 			}
 			else {
-				if (read_btg (infile, &tile[cnt])) {
+
+				if ((last_header = new_header (&all_header)) == NULL) {
+					fprintf(stderr, "no memory left for header!\n");
+					return EXIT_FAILURE;
+				}
+
+				if (read_btg (infile, last_header)) {
 					fprintf(stderr, "Problem while reading btg-file '%s'! exit.\n", file);
 				}
 				fclose (infile);
+				last_header->index = indices[cnt];
 
-				if (!tile[cnt]) {
-					fprintf(stderr, "tile '%s' points to nowhere! exit.\n", file);
-				}
 				if (holesize > -1.0)
-					tile[cnt]->base.holesize = holesize;
+					last_header->base.holesize = holesize;
 				else
-					tile[cnt]->base.holesize = 350.0;
+					last_header->base.holesize = 350.0;
 				if (strlen(texture))
-					tile[cnt]->base.material = texture;
+					last_header->base.material = texture;
 				else
-					tile[cnt]->base.material = NULL;
+					last_header->base.material = NULL;
 			}
 		}
 	}
+
+	printf("mark 1...\n");
+	printf("pointer: %p...\n", all_header);
 
 // build projection
-	if (airport) {
-		v = airport->base.vertex;
-
+	temp = all_header;
+	while (temp) {
+		v = temp->base.vertex;
 		while (v) {
-			projection(airport->base.bsphere, v);
+			projection(all_header->base.bsphere, v);
 			v = v->next;
 		}
+		temp = temp->next;
+	}
 
-		for (cnt = 0 ; cnt < 5 ; cnt++) {
-			if (index[cnt] != 0) {
-				v = tile[cnt]->base.vertex;
-				while (v) {
-					projection(airport->base.bsphere, v);
-					v = v->next;
-				}
-			}
-		}
-	}
-	else {
-		for (cnt = 0 ; cnt < 5 ; cnt++) {
-			if (index[cnt] != 0) {
-				v = tile[cnt]->base.vertex;
-				while (v) {
-					projection(tile[0]->base.bsphere, v);
-					v = v->next;
-				}
-			}
-		}
-	}
+	printf("mark 2...\n");
+	printf("pointer: %p...\n", all_header);
 
 // check btg datas
-	if (airport) check (airport);
-	for (cnt = 0 ; cnt < 5 ; cnt++) {
-		if (tile[cnt]) check (tile[cnt]);
+	temp = all_header;
+	while (temp) {
+		 check (temp);
+		temp = temp->next;
 	}
 
+	printf("mark 3...\n");
+	printf("pointer: %p...\n", all_header);
+	printf("index  : %d...\n", all_header->index);
+	printf("Name   : '%s'...\n", all_header->airport);
+
 // if we have a airport, check seams between airport and tiles
-	if (airport) {
-		for (cnt = 0 ; cnt < 5 ; cnt++) {
-			if (tile[cnt]) {
-				printf("check seam in tile %d ...\n", cnt);
-				check_seam (tile[cnt], airport->base.fence);
-				check_seam_edges (tile[cnt], airport->base.fence);
-			}
+	if (all_header->index < 0 && strlen(all_header->airport) > 0) {
+		temp = all_header->next;
+		while (temp) {
+			printf("check seam ...\n");
+			check_seam (temp, all_header->base.fence);
+			check_seam_edges (temp, all_header->base.fence);
+			temp = temp->next;
 		}
 	}
 
-// write new btg files
-	get_terrain_path (fullpath, basepath, index[0]);
-	if (airport) {
-		snprintf(file, PATH_MAX, "%.4078s/%.8s-new.btg", fullpath, filename);
+	printf("mark 4...\n");
+
+	temp = all_header;
+	while (temp) {
+
+		if (temp->index < 0 && strlen(temp->airport) > 0) {
+			snprintf(file, PATH_MAX, "%.4078s/%.8s-new.btg", fullpath, temp->airport);
+		}
+		else if (temp->index > 0 && strlen(temp->airport) == 0) {
+			get_terrain_path (fullpath, basepath, temp->index);
+			snprintf(file, PATH_MAX, "%.4084s/%d-new.btg", fullpath, temp->index);
+		}
+		else {
+			fprintf(stderr, "Unknown header! Index: %d / Airport '%s'! exit.\n", temp->index, temp->airport);
+			return EXIT_FAILURE;
+		}
+
 		if ((outfile = fopen(file, "wb")) == NULL) {
 			fprintf(stderr, "Can't create file '%s'! exit.\n", file);
 			return 2;
 		}
-		if (write_btg (outfile, airport)) {
+		printf("write file '%s' ...\n", file);
+		if (write_btg (outfile, temp)) {
 			fprintf(stderr, "Problem while writing btg-file '%s'! exit.\n", file);
 			fclose (outfile);
 			return EXIT_FAILURE;
 		}
 		fclose (outfile);
+		temp = temp->next;
 	}
 
-	for (cnt = 0 ; cnt < 5 ; cnt++) {
-		if (tile[cnt]) {
-			snprintf(file, PATH_MAX, "%.4084s/%d-new.btg", fullpath, index[cnt]);
-			if ((outfile = fopen(file, "wb")) == NULL) {
-				fprintf(stderr, "Can't create file '%s'! exit.\n", file);
-				return 2;
-			}
-			printf("write file '%s' ...\n", file);
-			if (write_btg (outfile, tile[cnt])) {
-				fprintf(stderr, "Problem while writing btg-file '%s'! exit.\n", file);
-				fclose (outfile);
-				return EXIT_FAILURE;
-			}
-			fclose (outfile);
-		}
-	}
+	printf("mark 5...\n");
+
+	free_header(all_header);
 
 	return EXIT_SUCCESS;
 }

@@ -25,6 +25,7 @@ typedef struct coord_cart_s {
 	long double z;
 } coord_cart;
 
+coord_geo vertex2geo (const btg_vertex *vertex);
 coord_geo  cart2geo (coord_cart cart);
 coord_cart geo2cart (coord_geo  geo);
 

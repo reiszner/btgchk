@@ -4,7 +4,7 @@
 #include "coord.h"
 #include "struct.h"
 
-btg_edge *rec_edge (btg_edge **all, btg_edge **last, btg_vertex *v0, btg_vertex *v1, btg_triangle *triangle);
+btg_edge *rec_edge (btg_base *base, btg_vertex *v0, btg_vertex *v1, btg_triangle *triangle);
 void unrec_edge (btg_edge *edge, btg_triangle *triangle);
 
 void free_edges (btg_edge *edges);

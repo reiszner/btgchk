@@ -88,7 +88,8 @@ void remove_unused_normals (btg_normal *normal) {
 		normal = normal->next;
 	}
 
-	if (error) printf("%zd unused normals deleted.\n", error);
+	printf("normals: %zd valid / %zd unused deleted.\n", cnt, error);
+
 }
 
 void check_same_normals (btg_normal *normal) {
@@ -106,16 +107,10 @@ void check_same_normals (btg_normal *normal) {
 			    normal->y == temp->y &&
 			    normal->z == temp->z
 			    ) {
-					if (normal->count > temp->count) {
-						temp->alias = normal;
-						normal->count += temp->count;
-						temp->valid = 0;
-					}
-					else {
-						normal->alias = temp;
-						temp->count += normal->count;
-						normal->valid = 0;
-					}
+					temp->alias = normal;
+					normal->count += temp->count;
+					temp->count = 0;
+					temp->valid = 0;
 					error++;
 				}
 				temp = temp->next;

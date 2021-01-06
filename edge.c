@@ -8,19 +8,14 @@
 #include "vertex.h"
 #include "triangle.h"
 
-btg_edge *rec_edge (btg_edge **all, btg_edge **last, btg_vertex *v0, btg_vertex *v1, btg_triangle *triangle) {
+btg_edge *rec_edge (btg_base *base, btg_vertex *v0, btg_vertex *v1, btg_triangle *triangle) {
 
-	int i;
+	int i, cnt = 0;
 	btg_vertex *temp;
 	btg_edge *edge = NULL;
 
-	if (all == NULL) {
-		fprintf(stderr, "rec_edge: pointer to all is NULL! break.\n");
-		return NULL;
-	}
-
-	if (last == NULL) {
-		fprintf(stderr, "rec_edge: pointer to last is NULL! break.\n");
+	if (base == NULL) {
+		fprintf(stderr, "rec_edge: pointer to base is NULL! break.\n");
 		return NULL;
 	}
 
@@ -45,7 +40,7 @@ btg_edge *rec_edge (btg_edge **all, btg_edge **last, btg_vertex *v0, btg_vertex 
 		v1 = temp;
 	}
 
-	edge = *all;
+	edge = base->edge;
 	if (edge) {
 		while (edge) {
 			if (edge->vertex[0] == v0 && edge->vertex[1] == v1) {
@@ -58,6 +53,7 @@ btg_edge *rec_edge (btg_edge **all, btg_edge **last, btg_vertex *v0, btg_vertex 
 				}
 				return edge;
 			}
+			cnt++;
 			edge = edge->next;
 		}
 	}
@@ -74,9 +70,9 @@ btg_edge *rec_edge (btg_edge **all, btg_edge **last, btg_vertex *v0, btg_vertex 
 	edge->count = 1;
 	edge->mark = 0;
 	edge->next = NULL;
-	if (*all) (*last)->next = edge;
-	else *all = edge;
-	*last = edge;
+	if (base->edge) base->edge_last->next = edge;
+	else base->edge = edge;
+	base->edge_last = edge;
 
 	return edge;
 }
@@ -109,7 +105,7 @@ void unrec_edge (btg_edge *edge, btg_triangle *triangle) {
 				edge->tria[cnt + 1] = NULL;
 			}
 		}
-		if (edge->count  == 0) edge->mark = 0;
+		if (edge->count == 0) edge->mark = 0;
 	}
 
 }
@@ -136,13 +132,14 @@ void free_border (btg_border *border) {
 
 int check_edges (btg_base *base, btg_edge *edge) {
 
-	int tria_cnt, vertex_cnt, error = 0, usage[3], point[10], chosen; //, before, ap, nonap;
+	int tria_cnt, vertex_cnt, error = 0, usage[3], point[10], chosen, ap, nonap;
 
 	while (edge) {
 //		before = edge->count;
 		if (edge->count > 2) {
 			printf("check_edges: edge usage is %d ...\n", edge->count);
-/*
+
+// material Airport should stay
 			ap = 0;
 			nonap = -1;
 			for (tria_cnt = 0 ; tria_cnt < 10 ; tria_cnt++) {
@@ -154,7 +151,7 @@ int check_edges (btg_base *base, btg_edge *edge) {
 			if (ap == 2 && nonap != -1) {
 				unrec_triangle (base, edge->tria[nonap]);
 			}
-*/
+
 			for (tria_cnt = 0 ; tria_cnt < 10 ; tria_cnt++) {
 				point[tria_cnt] = 0;
 				usage[0] = usage[1] = usage[2] = 0;
@@ -164,21 +161,36 @@ int check_edges (btg_base *base, btg_edge *edge) {
 						else if (edge->tria[tria_cnt]->edge[vertex_cnt]->count == 2) usage[1]++;
 						else if (edge->tria[tria_cnt]->edge[vertex_cnt]->count >  2) usage[2]++;
 					}
+					printf("border: %d / normal: %d / error: %d\n", usage[0], usage[1], usage[2]);
 					if      (usage[2] == 3 && usage[1] == 0 && usage[0] == 0) point[tria_cnt] = 6;
 					else if (usage[2] == 2 && usage[1] == 0 && usage[0] == 1) point[tria_cnt] = 5;
 					else if (usage[2] == 1 && usage[1] == 1 && usage[0] == 1) point[tria_cnt] = 4;
 					else if (usage[2] == 1 && usage[1] == 0 && usage[0] == 2) point[tria_cnt] = 3;
 					else if (usage[2] == 2 && usage[1] == 1 && usage[0] == 0) point[tria_cnt] = 2;
 					else if (usage[2] == 1 && usage[1] == 2 && usage[0] == 0) point[tria_cnt] = 1;
+					printf("Points: %d", point[tria_cnt]);
+					if (strncmp(edge->tria[tria_cnt]->object->prop_material, "Ocean", 5) == 0) {
+						printf(" '%s'", edge->tria[tria_cnt]->object->prop_material);
+						point[tria_cnt] += 5;
+						printf(" -> %d", point[tria_cnt]);
+					}
+					printf("\n");
+
 				}
 			}
+
 			while (edge->count > 2) {
 				chosen = 0;
 				for (tria_cnt = 0 ; tria_cnt < 10 ; tria_cnt++) {
 					if (point[tria_cnt] > point[chosen]) chosen = tria_cnt;
 				}
+				printf("kill triangle %d with %d points\n", chosen, point[chosen]);
 				unrec_triangle (base, edge->tria[chosen]);
-				point[chosen] = 0;
+				for (tria_cnt = chosen ; tria_cnt < 9 ; tria_cnt++) {
+					point[tria_cnt] = point[tria_cnt + 1];
+				}
+				point[9] = 0;
+
 				error++;
 			}
 		}
@@ -192,7 +204,7 @@ int check_edges (btg_base *base, btg_edge *edge) {
 btg_fence *collect_border (btg_edge **edge) {
 
 	int e1 = 0, e2 = 0, er = 0, found;
-	btg_edge *now = NULL, *prev = NULL;
+	btg_edge *now = NULL; //, *prev = NULL;
 	btg_border *new = NULL, *last = NULL;
 	btg_fence *fence = NULL;
 
@@ -212,9 +224,11 @@ btg_fence *collect_border (btg_edge **edge) {
 		if (now->count < 0) {
 			fprintf(stderr, "edge usage below 0 !!!\n");
 		}
+/*
 		else if (now->count == 0) {
 			fprintf(stderr, "unused edge !!!\n");
 		}
+*/
 		else if (now->count == 1) {
 			if ((new = malloc(sizeof (*new))) == NULL) {
 				fprintf(stderr, "no memory left for border!\n");
@@ -238,14 +252,30 @@ btg_fence *collect_border (btg_edge **edge) {
 				fence->max_y = now->vertex[0]->projection.y;
 				fence->turn = 0;
 			}
-			if (now->vertex[0]->projection.x < fence->min_x) fence->min_x = now->vertex[0]->projection.x;
-			if (now->vertex[0]->projection.x > fence->max_x) fence->max_x = now->vertex[0]->projection.x;
-			if (now->vertex[0]->projection.y < fence->min_y) fence->min_y = now->vertex[0]->projection.y;
-			if (now->vertex[0]->projection.y < fence->max_y) fence->max_y = now->vertex[0]->projection.y;
-			if (now->vertex[1]->projection.x < fence->min_x) fence->min_x = now->vertex[1]->projection.x;
-			if (now->vertex[1]->projection.x > fence->max_x) fence->max_x = now->vertex[1]->projection.x;
-			if (now->vertex[1]->projection.y < fence->min_y) fence->min_y = now->vertex[1]->projection.y;
-			if (now->vertex[1]->projection.y < fence->max_y) fence->max_y = now->vertex[1]->projection.y;
+			if (now->vertex[0]->projection.x < fence->min_x) {
+				fence->min_x = now->vertex[0]->projection.x;
+			}
+			if (now->vertex[0]->projection.x > fence->max_x) {
+				fence->max_x = now->vertex[0]->projection.x;
+			}
+			if (now->vertex[0]->projection.y < fence->min_y) {
+				fence->min_y = now->vertex[0]->projection.y;
+			}
+			if (now->vertex[0]->projection.y > fence->max_y) {
+				fence->max_y = now->vertex[0]->projection.y;
+			}
+			if (now->vertex[1]->projection.x < fence->min_x) {
+				fence->min_x = now->vertex[1]->projection.x;
+			}
+			if (now->vertex[1]->projection.x > fence->max_x) {
+				fence->max_x = now->vertex[1]->projection.x;
+			}
+			if (now->vertex[1]->projection.y < fence->min_y) {
+				fence->min_y = now->vertex[1]->projection.y;
+			}
+			if (now->vertex[1]->projection.y > fence->max_y) {
+				fence->max_y = now->vertex[1]->projection.y;
+			}
 			e1++;
 		}
 		else if (now->count == 2) e2++;
@@ -255,11 +285,15 @@ btg_fence *collect_border (btg_edge **edge) {
 			fprintf(stderr, "%f,%f,%f\n", now->vertex[0]->absolute.x, now->vertex[0]->absolute.y, now->vertex[0]->absolute.z);
 			fprintf(stderr, "%f,%f,%f\n", now->vertex[1]->absolute.x, now->vertex[1]->absolute.y, now->vertex[1]->absolute.z);
 		}
+
+/*
 		if (found) {
 			if (prev) prev->next = now->next;
 			else *edge = now->next;
 		}
 		else prev = now;
+*/
+
 		now = now->next;
 	}
 
@@ -406,84 +440,117 @@ btg_border *get_next_segment (btg_fence *all, btg_vertex *search, short directio
 }
 
 
-btg_fence *find_fence (btg_fence *border) {
+btg_fence *find_fence (btg_fence *all_fence) {
 
-	int count = 0, search = 1;
-	btg_fence *fence = NULL;
-	btg_border *last = NULL, *now = NULL;
+	int count, search;
+	btg_fence *new_fence = NULL;
+	btg_border *last = NULL, *now = NULL, *temp;
 
 	printf("********** new fence **********\n");
 
-	if (border == NULL) {
-		fprintf(stderr, "pointer to all borders is NULL! exit.\n");
+	if (all_fence == NULL) {
+		fprintf(stderr, "pointer to all all_fence is NULL! exit.\n");
 		return NULL;
 	}
 
-	last = now = border->border;
-	if (now == NULL) {
+	if (all_fence->border == NULL) {
 		fprintf(stderr, "pointer to first border is NULL! exit.\n");
 		return NULL;
 	}
 
-	if ((fence = malloc(sizeof (*fence))) == NULL) {
+	if ((new_fence = malloc(sizeof (*new_fence))) == NULL) {
 		fprintf(stderr, "no memory left for fence!\n");
-		return fence;
+		return new_fence;
 	}
-	fence->turn = 0;
-	fence->border = now;
-	fence->next = NULL;
+	new_fence->min_x = new_fence->max_x = new_fence->min_y = new_fence->max_y = 0.0;
+	new_fence->turn = 0;
+	new_fence->border = NULL;
+	new_fence->next = NULL;
 
-	border->border = border->border->next;
-	now->next = NULL;
+	while (new_fence->border == NULL && all_fence->border) {
 
-	fence->border->vertex = now->edge->vertex[0];
-	fence->min_x = now->edge->vertex[0]->projection.x;
-	fence->max_x = now->edge->vertex[0]->projection.x;
-	fence->min_y = now->edge->vertex[0]->projection.y;
-	fence->max_y = now->edge->vertex[0]->projection.y;
-	if (now->edge->vertex[1]->projection.x < fence->min_x) fence->min_x = now->edge->vertex[1]->projection.x;
-	if (now->edge->vertex[1]->projection.x > fence->max_x) fence->max_x = now->edge->vertex[1]->projection.x;
-	if (now->edge->vertex[1]->projection.y < fence->min_y) fence->min_y = now->edge->vertex[1]->projection.y;
-	if (now->edge->vertex[1]->projection.y < fence->max_y) fence->max_y = now->edge->vertex[1]->projection.y;
-	now->side = get_tria_side (now->edge->vertex[0], now->edge->vertex[1], now->edge->tria[0]);
-	count = 1;
+// init
+		count = 1;
+		search = 1;
+		now = last = all_fence->border;
+		all_fence->border = all_fence->border->next;
+		new_fence->border = now;
+		now->next = NULL;
+		now->vertex = now->edge->vertex[0];
+		now->side = get_tria_side (now->edge->vertex[0], now->edge->vertex[1], now->edge->tria[0]);
 
-	printf("search forward ...\n");
-	now = (void *) 1;
-	while (now && last->edge->vertex[search] != fence->border->vertex) {
-		if ((now = get_next_segment (border, last->edge->vertex[search], 1))) {
-			if      (last->edge->vertex[search] == now->edge->vertex[0]) search = 1;
-			else if (last->edge->vertex[search] == now->edge->vertex[1]) search = 0;
-			if (now->edge->vertex[search]->projection.x < fence->min_x) fence->min_x = now->edge->vertex[search]->projection.x;
-			if (now->edge->vertex[search]->projection.x > fence->max_x) fence->max_x = now->edge->vertex[search]->projection.x;
-			if (now->edge->vertex[search]->projection.y < fence->min_y) fence->min_y = now->edge->vertex[search]->projection.y;
-			if (now->edge->vertex[search]->projection.y > fence->max_y) fence->max_y = now->edge->vertex[search]->projection.y;
-			last->next = now;
-			last = last->next;
-			count++;
+// loop
+		while (now && last->edge->vertex[search] != new_fence->border->vertex) {
+			if ((now = get_next_segment (all_fence, last->edge->vertex[search], 1))) {
+				if      (last->edge->vertex[search] == now->edge->vertex[0]) search = 1;
+				else if (last->edge->vertex[search] == now->edge->vertex[1]) search = 0;
+				last->next = now;
+				last = last->next;
+				count++;
+
+// check shot circuit
+				temp = new_fence->border;
+				while (temp) {
+					if (temp != now && temp->vertex == now->vertex) {
+						printf("find_fence: shot circuit dedected!\n");
+						if ((temp = all_fence->border)) {
+							while (temp->next) temp = temp->next;
+							temp->next = new_fence->border;
+						}
+//						else all_fence->border = new_fence->border;
+						now = last = NULL;
+						new_fence->min_x = new_fence->max_x = new_fence->min_y = new_fence->max_y = 0.0;
+						new_fence->turn = 0;
+						new_fence->border = NULL;
+						new_fence->next = NULL;
+						temp = NULL;
+					}
+					if (temp) temp = temp->next;
+				}
+			}
 		}
 	}
 
 // if fence isn't closed, search on the other side
-	if (last->edge->vertex[search] != fence->border->vertex) {
+	if (new_fence->border && last->edge->vertex[search] != new_fence->border->vertex) {
 		printf("search backward ...\n");
 		now = (void *) 1;
-		while (now && last->edge->vertex[search] != fence->border->vertex) {
-			if ((now = get_next_segment (border, fence->border->vertex, 0))) {
-				if (now->vertex->projection.x < fence->min_x) fence->min_x = now->vertex->projection.x;
-				if (now->vertex->projection.x > fence->max_x) fence->max_x = now->vertex->projection.x;
-				if (now->vertex->projection.y < fence->min_y) fence->min_y = now->vertex->projection.y;
-				if (now->vertex->projection.y > fence->max_y) fence->max_y = now->vertex->projection.y;
-				now->next = fence->border;
-				fence->border = now;
+		while (now && last->edge->vertex[search] != new_fence->border->vertex) {
+			if ((now = get_next_segment (all_fence, new_fence->border->vertex, 0))) {
+				now->next = new_fence->border;
+				new_fence->border = now;
 				count++;
 			}
 		}
 	}
 
+	if ((now = new_fence->border)) {
+		new_fence->min_x = new_fence->max_x = now->vertex->projection.x;
+		new_fence->min_y = new_fence->max_y = now->vertex->projection.y;
+		while (now) {
+			if (now->vertex->projection.x < new_fence->min_x) new_fence->min_x = now->vertex->projection.x;
+			if (now->vertex->projection.x > new_fence->max_x) new_fence->max_x = now->vertex->projection.x;
+			if (now->vertex->projection.y < new_fence->min_y) new_fence->min_y = now->vertex->projection.y;
+			if (now->vertex->projection.y > new_fence->max_y) new_fence->max_y = now->vertex->projection.y;
+			now = now->next;
+		}
+	}
+
 	printf("found fence with %d segments\n", count);
 
-	return fence;
+	if ((now = new_fence->border)) {
+		while (now) {
+			printf ("%p: x=%f y=%f z=%f\n", now->vertex, now->vertex->relative.x, now->vertex->relative.y, now->vertex->relative.z);
+			now = now->next;
+		}
+	}
+
+	if (new_fence->border == NULL) {
+		free (new_fence);
+		new_fence = NULL;
+	}
+
+	return new_fence;
 }
 
 
@@ -553,7 +620,7 @@ int check_vectorline (btg_fence *fence, short aspect) {
 	return 0;
 }
 
-btg_fence *examine_fence (btg_fence *fence, btg_base *basex) {
+btg_fence *examine_fence (btg_fence *fence, btg_base *base) {
 
 	int left_side = 0, right_side = 0;
 	btg_border *last = NULL, *now = NULL;
@@ -561,7 +628,7 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *basex) {
 	btg_edge edge_res;
 	double len;
 
-	if (basex == NULL) {
+	if (base == NULL) {
 		fprintf(stderr, "examine_fence: pointer to base is NULL! exit.\n");
 		return NULL;
 	}
@@ -580,7 +647,7 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *basex) {
 	while (last->next) last = last->next;
 
 // if fence is closed
-	if (last->edge->vertex[0] == fence->border->vertex || last->edge->vertex[1] == fence->border->vertex) {
+	if (last->edge->vertex[0] == now->vertex || last->edge->vertex[1] == now->vertex) {
 
 // if all vertices on the same vector, free it and return nothing ...
 		if (check_vectorline(fence, USE_RELATIVE)) {
@@ -593,8 +660,8 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *basex) {
 // ... otherwise its a hole or island
 // calculate turn
 		turn = 0.0;
-		angle[0] = get_angle(last->vertex, fence->border->vertex);
-		now = fence->border;
+		angle[0] = get_angle(last->vertex, now->vertex);
+
 // sum up differences
 		while (now->next) {
 			angle[1] = get_angle(now->vertex, now->next->vertex);
@@ -629,15 +696,15 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *basex) {
 				}
 				else if (right_side > 0 && left_side == 0) {
 					printf("examine_fence: fence is a hole!\n");
-					if ((fence->max_x - fence->min_x) < basex->holesize && (fence->max_y - fence->min_y) < basex->holesize) {
+					if ((fence->max_x - fence->min_x) < base->holesize && (fence->max_y - fence->min_y) < base->holesize) {
 						printf("examine_fence: close it!\n");
-						close_hole (fence, basex);
+						close_hole (fence, base);
 						return NULL;
 					}
 				}
 				else {
 					if (check_vectorline(fence, USE_PROJECTION)) {
-						close_hole (fence, basex);
+						close_hole (fence, base);
 						return NULL;
 					}
 				}
@@ -648,7 +715,7 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *basex) {
 				len = pydacoras(edge_res.vertex[0], edge_res.vertex[1], USE_RELATIVE);
 				if (len < 0.10) {
 					printf("examine_fence: collaps vertex %f\n", len);
-					collaps_vertices (edge_res.vertex[0], edge_res.vertex[1], basex);
+					collaps_vertices (edge_res.vertex[0], edge_res.vertex[1], base);
 					free_border (fence->border);
 					free (fence);
 					return NULL;
@@ -667,15 +734,15 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *basex) {
 				}
 				else if (left_side > 0 && right_side == 0) {
 					printf("examine_fence: fence is a hole!\n");
-					if ((fence->max_x - fence->min_x) < basex->holesize && (fence->max_y - fence->min_y) < basex->holesize) {
+					if ((fence->max_x - fence->min_x) < base->holesize && (fence->max_y - fence->min_y) < base->holesize) {
 						printf("examine_fence: close it!\n");
-						close_hole (fence, basex);
+						close_hole (fence, base);
 						return NULL;
 					}
 				}
 				else {
 					if (check_vectorline(fence, USE_PROJECTION)) {
-						close_hole (fence, basex);
+						close_hole (fence, base);
 						return NULL;
 					}
 				}
@@ -686,7 +753,7 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *basex) {
 				len = pydacoras(edge_res.vertex[0], edge_res.vertex[1], USE_RELATIVE);
 				if (len < 0.10) {
 					printf("examine_fence: collaps vertex %f\n", len);
-					collaps_vertices (edge_res.vertex[0], edge_res.vertex[1], basex);
+					collaps_vertices (edge_res.vertex[0], edge_res.vertex[1], base);
 					free_border (fence->border);
 					free (fence);
 					return NULL;
@@ -705,7 +772,7 @@ btg_fence *examine_fence (btg_fence *fence, btg_base *basex) {
 		len = pydacoras(edge_res.vertex[0], edge_res.vertex[1], USE_RELATIVE);
 		if (len < 0.25) {
 			printf("examine_fence: collaps vertex %f\n", len);
-			collaps_vertices (edge_res.vertex[0], edge_res.vertex[1], basex);
+			collaps_vertices (edge_res.vertex[0], edge_res.vertex[1], base);
 /*
 			free_border (fence->border);
 			free (fence);
@@ -1030,19 +1097,57 @@ int calc_texcoo (btg_triangle *triangle, btg_object *object, btg_base *base) {
 	btg_vertex temp_texcoo[3];
 	btg_texcoo *texcoo;
 
+	printf("calc_texcoo: start ...\n");
+
+	if (triangle == NULL) {
+		printf("calc_texcoo: triangle is NULL!\n");
+		return -1;
+	}
+
+	if (object == NULL) {
+		printf("calc_texcoo: object is NULL!\n");
+		return -1;
+	}
+
+	if (base == NULL) {
+		printf("calc_texcoo: base is NULL!\n");
+		return -1;
+	}
+
 	for (i = 0 ; i < 3 ; i++) {
 		tria[i] = NULL;
 		len[i] = 0.0;
+		printf("mark 1 (%d) ...\n", i);
 		for (j = 0 ; j < 10 ; j++) {
-			if (triangle->edge[i]->tria[j] && triangle->edge[i]->tria[j]->object == triangle->object && triangle->edge[i]->tria[j] != triangle) {
-				tria[i] = triangle->edge[i]->tria[j];
+			printf("mark: i (%d) j (%d) ...\n", i, j);
+			if (triangle->edge[i] != NULL) {
+				printf("triangle->edge[i]: %p\n", triangle->edge[i]);
+				if (triangle->edge[i]->tria[j] != NULL) {
+					printf("triangle->edge[i]->tria[j]: %p\n", triangle->edge[i]->tria[j]);
+					if (triangle->edge[i]->tria[j]->object != NULL) {
+						printf("triangle->edge[i]->tria[j]->object: %p\n", triangle->edge[i]->tria[j]->object);
+						printf("triangle->object: %p\n", triangle->object);
+						if (
+						    triangle->edge[i]->tria[j] &&
+						    triangle->edge[i]->tria[j]->object == triangle->object &&
+						    triangle->edge[i]->tria[j] != triangle
+						    ) {
+							printf("after test ...\n");
+							tria[i] = triangle->edge[i]->tria[j];
+						}
+					}
+				}
 			}
 		}
+		printf("mark 2 (%d) ...\n", i);
 		if (tria[i]) {
 			len[i] = pydacoras(triangle->edge[i]->vertex[0], triangle->edge[i]->vertex[1], USE_PROJECTION);
+			printf("len[%d] = %f\n", i, len[i]);
 		}
+		printf("mark 3 (%d) ...\n", i);
 	}
 
+	printf("calc_texcoo: len ...\n");
 	found = 0;
 	for (i = 0 ; i < 3 ; i++) {
 		if (len[i] > len[found]) found = i;
@@ -1050,6 +1155,7 @@ int calc_texcoo (btg_triangle *triangle, btg_object *object, btg_base *base) {
 
 	if (tria[found] == NULL) return -1;
 
+	printf("calc_texcoo: geo ...\n");
 	geo_new = triangle->elem->element;
 	while (geo_new) {
 		geo_found = tria[found]->elem->element;
@@ -1066,6 +1172,7 @@ int calc_texcoo (btg_triangle *triangle, btg_object *object, btg_base *base) {
 		geo_new = geo_new->next;
 	}
 
+	printf("calc_texcoo: check ...\n");
 	if (!first) {
 		fprintf(stderr, "havn't found first texcoo!\n");
 		return 1;
@@ -1086,6 +1193,7 @@ int calc_texcoo (btg_triangle *triangle, btg_object *object, btg_base *base) {
 		return 3;
 	}
 
+	printf("calc_texcoo: texcoo ...\n");
 	texcoo = base->texcoo;
 	while (texcoo->next) texcoo = texcoo->next;
 
@@ -1180,6 +1288,7 @@ btg_triangle *build_triangle (btg_border *b0, btg_border *b1, btg_border *b2, bt
 	normal = vector2normal(area_vec, base);
 
 // get material with longest edges
+	printf("get material with longest edges ...\n");
 	len[0] = pydacoras(b0->vertex, b1->vertex, USE_RELATIVE);
 	if (b0->edge)
 		obj[0] = b0->edge->tria[0]->object;
@@ -1214,11 +1323,19 @@ btg_triangle *build_triangle (btg_border *b0, btg_border *b1, btg_border *b2, bt
 		obj[2] = NULL;
 	}
 
-	mat = 0;
+	mat = -1;
+	if (obj[0]) mat = 0;
 	if (obj[1] && len[1] > len[mat]) mat = 1;
 	if (obj[2] && len[2] > len[mat]) mat = 2;
 
+	if (mat < 0) {
+		printf("no material found!\n");
+		return NULL;
+	}
+
+	printf("have material %d ...\n", mat);
 	if (base->material) {
+		printf("have custom texture: '%s'\n", base->material);
 		btg_triangle *tria = base->triangle;
 		while (tria && strcmp(tria->object->prop_material, base->material)) tria = tria->next;
 		if (tria) {
@@ -1227,12 +1344,21 @@ btg_triangle *build_triangle (btg_border *b0, btg_border *b1, btg_border *b2, bt
 		}
 	}
 
+	printf("make new material %d ...\n", mat);
 	new_elem = obj[mat]->elem_list;
 	while (new_elem->next) new_elem = new_elem->next;
 	if ((new_elem->next = malloc(sizeof(*new_elem))) == NULL) {
 		fprintf(stderr, "no memory left for element! break.\n");
 		return NULL;
 	}
+
+
+	printf("obj[mat]->obj_type : %d\n", obj[mat]->obj_type);
+	printf("obj[mat]->elem_cnt : %d\n", obj[mat]->elem_cnt);
+	printf("obj[mat]->prop_mask: %x\n", obj[mat]->prop_mask);
+	printf("obj[mat]->prop_material: %s\n", obj[mat]->prop_material);
+
+
 	new_elem = new_elem->next;
 	new_elem->valid = 1;
 	new_elem->count = 3;
@@ -1314,11 +1440,18 @@ btg_triangle *build_triangle (btg_border *b0, btg_border *b1, btg_border *b2, bt
 
 	geo->next = NULL;
 
+	geo = new_elem->element;
+	while(geo) {
+		printf("geo: %f %f %f\n", geo->vertex->relative.x, geo->vertex->relative.y, geo->vertex->relative.z);
+		geo = geo->next;
+	}
+
 	if (add_triangle (new_elem, base, obj[mat])) {
 		fprintf(stderr, "there was a problem while adding triangle! break.\n");
 		return NULL;
 	}
 
+	printf("call calc_texcoo ...\n");
 	if (obj[mat]->prop_mask & MASK_TEXCOO) {
 		if (calc_texcoo (base->triangle_last, obj[mat], base) < 0) {
 			fprintf(stderr, "no texture found!\n");
@@ -1441,6 +1574,7 @@ void close_hole (btg_fence *fence, btg_base *base) {
 		}
 
 // search shortest edge that build a triangle to the appropriate side
+		printf("search shortest edge that build a triangle to the appropriate side ...\n");
 		first = NULL;
 		while (!first) {
 			now = fence->border;
@@ -1467,6 +1601,7 @@ void close_hole (btg_fence *fence, btg_base *base) {
 		}
 
 // build a triangle with first, second and third
+		printf("build a triangle with first, second and third ...\n");
 		t_after = build_triangle (first, second, third, base, 2);
 		for (i = 0 ; i < 3 ; i++) {
 			if ((t_after->edge[i]->vertex[0] == first->vertex && t_after->edge[i]->vertex[1] == third->vertex) ||
@@ -1491,6 +1626,7 @@ void close_hole (btg_fence *fence, btg_base *base) {
 		cnt--;
 	}
 
+	printf("build the last triangle ...\n");
 	if (cnt == 3) {
 // build the last triangle
 		first = fence->border;
@@ -1499,6 +1635,7 @@ void close_hole (btg_fence *fence, btg_base *base) {
 		t_after = build_triangle (first, second, third, base, 3);
 	}
 
+	printf("clean up ...\n");
 	free_border (fence->border);
 	free (fence);
 	free (len_all);

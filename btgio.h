@@ -6,7 +6,7 @@
 
 #include "header.h"
 
-int read_btg  (FILE *f, btg_header **header);
+int read_btg  (FILE *f, btg_header *header);
 int write_btg (FILE *f, btg_header *header);
 
 #endif
